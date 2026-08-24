@@ -1,0 +1,18 @@
+# Produksi mini di VPS: `docker compose up -d`
+# Untuk deploy utama tetap Vercel; compose ini untuk fallback/self-host & uji lokal.
+services:
+  web:
+    build: .
+    image: ghcr.io/sarangrumah/bct-website:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_UMAMI_SRC=${NEXT_PUBLIC_UMAMI_SRC:-}
+      - NEXT_PUBLIC_UMAMI_ID=${NEXT_PUBLIC_UMAMI_ID:-}
+      - LEAD_WEBHOOK_URL=${LEAD_WEBHOOK_URL:-}
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true

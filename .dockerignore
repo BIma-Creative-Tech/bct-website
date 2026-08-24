@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.github
+docs
+*.md
+!README.md
+.env*
+.claude
+.vercel

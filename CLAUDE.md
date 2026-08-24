@@ -69,3 +69,26 @@ Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token dide
 3. Setiap halaman punya `metadata` Next.js lengkap (title pola `X — Bima Creative Tech`, description, OG).
 4. Jangan menambah dependensi tanpa alasan tertulis di PR. Jangan tambah halaman di luar sitemap tanpa diminta.
 5. Selesai fitur = `npm run build` hijau + cek visual light & dark.
+
+## Tim agent & orkestrasi (WAJIB)
+
+Tugas multi-langkah apa pun dimulai dari agent **`lead`** (`.claude/agents/lead.md`) — ia memecah pekerjaan, mendelegasikan, dan menjaga checklist. Spesialis di bawahnya:
+
+| Agent | Tugas | Batas |
+|---|---|---|
+| `lead` | Orkestrasi, pecah tugas, delegasi, update checklist, lapor | Tidak menulis fitur sendiri |
+| `frontend-builder` | Halaman/komponen Next.js + Tailwind sesuai token | Tidak menulis copy, tidak sentuh CI/Docker |
+| `content-writer` | Copy Bahasa Indonesia (content/, docs/) | Tidak sentuh kode komponen |
+| `security-auditor` | Audit keamanan diff API/form/config/deps/Docker/CI | Read-only + laporan berperingkat |
+| `devops-engineer` | Docker, workflow CI/CD, release/versioning, env | Perubahannya wajib diaudit security-auditor |
+| `qa-reviewer` | Verifikasi DoD, naikkan status ke 🟨 | Tidak boleh meloloskan dengan catatan |
+| `docs-keeper` | CHANGELOG, checklist, decisions.md, README sinkron | Tidak sentuh kode aplikasi |
+
+## Governance (ditegakkan CI — bukan sekadar konvensi)
+
+- **Papan status: `docs/checklist.md`.** Alur: ⬜ → 🔨 → 🧪 → 🟨 KONFIRMASI-OWNER → ✅. **Hanya owner (Ade) yang menjadikan ✅** — agent berhenti di 🟨 dengan bukti satu baris. Owner mengonfirmasi dengan "konfirmasi <ID>".
+- **Setiap perubahan kode** wajib memperbarui `CHANGELOG.md` ([Unreleased], format Keep a Changelog) dan `docs/checklist.md` di commit yang sama — CI merah bila tidak (`scripts/check-governance.mjs`).
+- **Commit**: Conventional Commits (feat/fix/chore/docs/ci/sec). **Rilis**: SemVer; tag `v*` → CI build image ke `ghcr.io/sarangrumah/bct-website`; tag hanya setelah owner konfirmasi.
+- **Keamanan**: baca `SECURITY.md`; header di `next.config.ts` dan pola `/api/lead` (zod + honeypot + rate limit) adalah baseline — jangan diturunkan.
+- **Keputusan penting** dicatat di `docs/decisions.md` (ADR mini) pada sesi yang sama.
+- Gerbang konfirmasi owner: deploy production, perubahan harga/pricing, dependency baru, perubahan CI/Docker, dan hal yang menyentuh data pribadi.
