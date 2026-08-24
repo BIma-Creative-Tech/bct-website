@@ -8,9 +8,12 @@ export const site = {
   name: "Bima Creative Tech",
   shortName: "BCT",
   tagline: "Sistem bisnis modern untuk UKM Indonesia — ERP, dashboard AI, dan aplikasi yang dibangun cepat dan presisi.",
-  whatsappNumber: "62XXXXXXXXXXX", // TODO: isi nomor WA bisnis BCT (format internasional tanpa +)
-  email: "halo@bimacreative.tech", // TODO: konfirmasi alamat email resmi
-  domain: "https://bimacreative.tech", // TODO: konfirmasi domain final
+  whatsappNumber: "6285640718785",
+  email: "am.ademaryadi@gmail.com",
+  // SEMENTARA: domain lokal untuk development.
+  // metadataBase dan URL OG image di app/layout.tsx mengikuti nilai ini.
+  // WAJIB diganti ke domain produksi sebelum deploy production (checklist W3-04).
+  domain: "http://localhost:3000",
   location: "Depok, Indonesia",
 } as const;
 
