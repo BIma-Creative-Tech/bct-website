@@ -23,6 +23,10 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 - W1-02: judul default di `app/layout.tsx` dibalik menjadi `… — Bima Creative Tech` agar mengikuti pola judul di CLAUDE.md.
 - G-11: `content/site.ts` — `whatsappNumber` dan `email` diisi data resmi dari owner; `domain` diisi sementara `http://localhost:3000` dengan komentar bahwa `metadataBase`/OG mengikutinya dan wajib diganti sebelum deploy production (W3-04).
 
+### Fixed
+
+- G-06: `public/.gitkeep` ditambahkan agar Git melacak direktori `public/`. Sebelumnya direktori itu kosong sehingga tidak ikut ter-checkout, dan `COPY /app/public ./public` di `Dockerfile:25` selalu gagal — job `docker` di CI merah pada push pertama (run 32745250265). Dockerfile tidak diubah. Hapus `.gitkeep` saat `public/` diisi favicon/OG image di W3-01.
+
 ### Security
 
 - G-13: `react/jsx-no-target-blank` dikeraskan ke `error` (preset Next mematikannya) — seluruh tautan `wa.me` bertarget `_blank` wajib membawa `rel="noopener noreferrer"` agar tidak bisa di-reverse-tabnab.
