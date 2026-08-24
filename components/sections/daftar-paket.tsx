@@ -1,0 +1,45 @@
+import { WaButton } from "@/components/wa-button";
+import type { Paket } from "@/content/site";
+import { DaftarTanda } from "./daftar-tanda";
+
+/**
+ * Kartu paket/harga. SELURUH isinya (nama, harga, satuan, deskripsi, fitur, pesan
+ * prefill WhatsApp) dirender dari `produk[].paket` di content/site.ts — tidak ada
+ * satu pun angka harga yang diketik di komponen ini.
+ *
+ * `labelCta` sengaja jadi prop, bukan diimpor dari content/copy: komponen ini harus
+ * bebas teks agar bisa dipakai ulang /pricing. Tipe `Paket` hanya menyimpan
+ * `ctaPesan` tanpa label tombol — lihat catatan untuk owner di laporan W2-01.
+ * Karena tombolnya berulang, pembedanya ditaruh di aria-label (nama paket dari site.ts).
+ */
+export function DaftarPaket({ paket, labelCta }: { paket: Paket[]; labelCta: string }) {
+  return (
+    <ul className="mt-10 grid gap-4 sm:grid-cols-2">
+      {paket.map((item) => (
+        <li
+          key={item.nama}
+          className="flex flex-col rounded-2xl border border-line bg-surface p-6 sm:p-8"
+        >
+          <h3 className="font-display text-xl font-bold text-ink">{item.nama}</h3>
+
+          <p className="mt-4 font-mono text-2xl font-semibold text-ink">
+            {item.harga}
+            {item.satuan ? <span className="text-base text-muted">{item.satuan}</span> : null}
+          </p>
+
+          <p className="mt-3 text-sm text-ink-2">{item.deskripsi}</p>
+
+          <DaftarTanda item={item.fitur} className="mt-6 flex-1 border-t border-line pt-6" />
+
+          <WaButton
+            pesan={item.ctaPesan}
+            ariaLabel={`${labelCta} — ${item.nama}`}
+            className="mt-8"
+          >
+            {labelCta}
+          </WaButton>
+        </li>
+      ))}
+    </ul>
+  );
+}

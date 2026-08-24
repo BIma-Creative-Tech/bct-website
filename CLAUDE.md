@@ -92,3 +92,13 @@ Tugas multi-langkah apa pun dimulai dari agent **`lead`** (`.claude/agents/lead.
 - **Keamanan**: baca `SECURITY.md`; header di `next.config.ts` dan pola `/api/lead` (zod + honeypot + rate limit) adalah baseline — jangan diturunkan.
 - **Keputusan penting** dicatat di `docs/decisions.md` (ADR mini) pada sesi yang sama.
 - Gerbang konfirmasi owner: deploy production, perubahan harga/pricing, dependency baru, perubahan CI/Docker, dan hal yang menyentuh data pribadi.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

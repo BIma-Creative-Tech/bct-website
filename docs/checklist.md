@@ -25,6 +25,8 @@ Alur status: `⬜ TODO` → `🔨 IN PROGRESS` → `🧪 REVIEW` (qa-reviewer) �
 | G-11 | Isi data resmi: nomor WA, email, domain di content/site.ts | **owner** | 🟨 KONFIRMASI-OWNER | QA: 3 TODO hilang, `waLink()` render `wa.me/6285640718785?text=` di HTML, `new URL(site.domain)` build hijau, grep repo: kontak hanya di content/site.ts; domain `http://localhost:3000` MASIH SEMENTARA sampai W3-04; owner konfirmasi nilai email, 2026-08-24 |
 | G-12 | Setup project Vercel + env dari .env.example | owner + devops-engineer | ⬜ TODO | |
 | G-13 | ESLint flat config (`eslint.config.mjs`) agar `npm run lint` hijau | devops-engineer | 🟨 KONFIRMASI-OWNER | QA: `npm run lint` exit 0, 27 file dilint (app+components+content) 0 error/warning, config tidak mematikan rule apa pun, `react/jsx-no-target-blank`=error terbukti menyala pada file uji, diff package.json/lock kosong, 2026-08-24 |
+| G-14 | CSP: `'unsafe-eval'` hanya di NODE_ENV=development (React dev overlay) | devops-engineer | 🟨 KONFIRMASI-OWNER | QA verifikasi mandiri: build+tsc+lint exit 0; header produksi di `next start` DAN `.next/routes-manifest.json` = `script-src 'self' 'unsafe-inline'` (nihil `unsafe-eval`, string identik baseline); dev server :3000 terbukti MEMANG dapat `'unsafe-eval'`; fail-closed diuji 7 nilai NODE_ENV (unset/kosong/production/test/staging/Development/DEVELOPMENT) semuanya bersih; komentar next.config.ts:13 kini berbunyi 'bukan garansi struktural' dan logikanya tetap satu ternary di baris 28; `git diff .github/` kosong (G-15 tidak diselundupkan), 2026-08-25 |
+| G-15 | Guard CI: build gagal bila `'unsafe-eval'` muncul di `.next/routes-manifest.json` | devops-engineer | ⬜ TODO | **GERBANG KONFIRMASI OWNER** (perubahan CI). Usul security-auditor saat audit G-14: invariant 'header produksi tidak pernah memuat unsafe-eval' kini hanya dijaga audit manual. Auditor membuktikan `next build --debug-prerender` menghasilkan artefak produksi ber-`unsafe-eval` dengan exit 0. Satu step setelah `npm run build` mengunci invariant itu ke mesin |
 
 ## W1 — Struktur & Copy (target: minggu ke-1 Sep 2026, ±8 jam)
 
@@ -39,7 +41,7 @@ Alur status: `⬜ TODO` → `🔨 IN PROGRESS` → `🧪 REVIEW` (qa-reviewer) �
 
 | ID | Tugas | Pemilik | Status | Bukti/Catatan |
 |---|---|---|---|---|
-| W2-01 | Halaman produk ×3 (bima-insight, odoo, web-apps) | frontend-builder | ⬜ TODO | data dari content/site.ts |
+| W2-01 | Halaman produk ×3 (bima-insight, odoo, web-apps) | frontend-builder | 🟨 KONFIRMASI-OWNER | QA verifikasi mandiri: build+tsc+lint exit 0; 3 rute HTTP 200 dgn page.tsx 18/15/15 baris; 15 file components/sections/ tanpa satu pun deklarasi type sendiri (semua diimpor dari @/content/*), FAQ `<details>/<summary>` native tanpa "use client"; tiap halaman tepat 1 `<title>` sufiks tunggal + 1 `<h1>` + og:title identik; 7 harga render persis site.ts baris 51/59/76/83/100/102/107; nihil hex/`dark:`/text-gray/bg-white/harga/nomor WA hardcode; hanya `wa.me/6285640718785` yang muncul; diff content/ (selain index.ts utk W2-09), app/globals.css, package.json semuanya kosong; beranda tetap 200 + 1 h1 + 1 title. CATATAN TERBUKA: `kelasKartu` (kelas-section.ts:23) diekspor tapi nol pemakai, 2026-08-25 |
 | W2-02 | Halaman pricing (rate card + custom "mulai dari") | frontend-builder | ⬜ TODO | + tombol unduh rate card PDF |
 | W2-03 | Halaman studi kasus (KOMDIGI + retail) | content-writer + frontend-builder | ⬜ TODO | fakta dari owner bila kurang |
 | W2-04 | Halaman tentang (sejarah BCT, cara kerja) | content-writer + frontend-builder | ⬜ TODO | |
@@ -47,6 +49,8 @@ Alur status: `⬜ TODO` → `🔨 IN PROGRESS` → `🧪 REVIEW` (qa-reviewer) �
 | W2-06 | Insight/blog: list + detail MDX + 1 artikel perdana | content-writer + frontend-builder | ⬜ TODO | |
 | W2-07 | Audit keamanan form & halaman baru | security-auditor | ⬜ TODO | verdict LULUS wajib sebelum 🟨 |
 | W2-08 | Review W2 menyeluruh | qa-reviewer | ⬜ TODO | |
+| W2-09 | `app/not-found.tsx`: halaman 404 bermerek + tombol WA | content-writer + frontend-builder | 🟨 KONFIRMASI-OWNER | QA verifikasi mandiri: `/rute-ngawur-qa-123` status HTTP tetap 404, tepat 1 `<title>Halaman tidak ditemukan — Bima Creative Tech</title>`, `could not be found` = 0 kemunculan, 1 `<h1>` Bahasa Indonesia, `robots: noindex` tersuntik, nihil canonical; tombol WA render `wa.me/6285640718785?text=` + `rel="noopener noreferrer"`; href internal di dalam `<main>` HANYA `/` + 3 rute produk (nihil /pricing /kontak /studi-kasus /tentang /insight); copy terdaftar di content/copy/index.ts. CATATAN TERBUKA: nav+footer di luar `<main>` masih menautkan 4 rute mati (warisan W1-02) sehingga 404→404 masih mungkin lewat nav, 2026-08-25 | Item terpisah dari W2-01 (ADR ada di docs/decisions.md). Alasan: setelah W2-01, 5 dari 9 rute sitemap masih 404 (pricing, studi-kasus, tentang, kontak, insight) sampai W2-02..W2-06 selesai, dan 404 bawaan Next menerbitkan `<title>` KEDUA berbahasa Inggris (`404: This page could not be found.`) di atas layout Indonesia |
+| W2-10 | Bersihkan sisa W2-01: komentar & ekspor yang sudah tidak dipakai | content-writer + frontend-builder | ⬜ TODO | Temuan qa-reviewer 2026-08-25: (a) `content/copy/index.ts:53` masih berkomentar `produkCopy` "dipakai halaman dinamis /produk/[slug]" padahal ADR memutuskan rute literal — aktif menyesatkan agent berikutnya; (b) `produkCopy` nol pemakai di seluruh repo (pre-existing, warisan W1-01); (c) ekspor `kelasKartu` di `components/sections/kelas-section.ts:23` nol pemakai — kemungkinan terpakai saat W2-02, cek dulu sebelum dihapus. Sengaja TIDAK dikerjakan bersama W2-01/W2-09 agar bukti QA keduanya tidak batal |
 
 ## W3 — Poles & Rilis (minggu ke-3, ±10 jam)
 
@@ -59,6 +63,7 @@ Alur status: `⬜ TODO` → `🔨 IN PROGRESS` → `🧪 REVIEW` (qa-reviewer) �
 | W3-05 | Rilis v0.1.0: tag, CHANGELOG dipindah dari Unreleased, image GHCR terbit | devops-engineer | ⬜ TODO | setelah W3-04 dikonfirmasi |
 | W3-06 | Audit keamanan pra-rilis penuh | security-auditor | ⬜ TODO | |
 | W3-07 | Rekam video demo konsep Bima Insight untuk halaman produk | owner | ⬜ TODO | bahan dari build plan |
+| W3-08 | Bug aksesibilitas: kontras `text-muted` gagal WCAG AA di light mode | frontend-builder + **owner** | ⬜ TODO | **GERBANG KONFIRMASI OWNER** (mengubah design token di `app/globals.css` = keputusan identitas visual). Diukur qa-reviewer 2026-08-25: `--muted #8b8880` = **3.25:1** di `bg` dan **3.45:1** di `surface`, ambang teks normal 4.5:1. Dark mode aman (4.92–5.49:1). Teks bermakna yang terdampak: satuan harga `/bulan` di `components/sections/daftar-paket.tsx:27` (16px); pemakaian lain `aria-hidden` (dekoratif, ambang 3:1, lolos). Cacat token warisan W1-02/W1-03, bukan cacat W2-01. Perbaikan: gelapkan `--muted` khusus light mode |
 
 ---
 

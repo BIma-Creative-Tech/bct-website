@@ -46,6 +46,9 @@ export type { FormKontakCopy, JalurKontak, KontakCopy, OpsiProduk } from "./kont
 export { footer, navCta, navProduk, navUtama, waMengambang } from "./umum";
 export type { FooterCopy, GrupFooter, ItemNav, ItemNavProduk } from "./umum";
 
+export { tidakDitemukan } from "./tidak-ditemukan";
+export type { TidakDitemukanCopy } from "./tidak-ditemukan";
+
 /**
  * Peta copy produk per slug — dipakai halaman dinamis /produk/[slug].
  * Slug-nya sama dengan `produk[].slug` di content/site.ts.
