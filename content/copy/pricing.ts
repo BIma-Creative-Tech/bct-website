@@ -50,14 +50,9 @@ export const pricing: PricingCopy = {
       label: "Tanya harga untuk kebutuhan saya",
       pesan: "Halo BCT, saya sudah lihat rate card. Bisa bantu perkirakan angkanya untuk kebutuhan saya?",
     },
-    // SEMENTARA (W2-02): aslinya { label: "Lihat cara kerja kami", href: "/tentang" }.
-    // Rute /tentang belum ada (404) sampai W2-04 selesai, jadi CTA ini dialihkan ke
-    // beranda — satu-satunya halaman hidup yang merangkum ketiga lini layanan untuk
-    // pengunjung yang mendarat langsung di halaman harga.
-    // KEMBALIKAN ke label + href asli begitu W2-04 (halaman /tentang) selesai.
     sekunder: {
-      label: "Lihat ringkasan tiga layanan kami",
-      href: "/",
+      label: "Lihat cara kerja kami",
+      href: "/tentang",
     },
   },
 

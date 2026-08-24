@@ -10,14 +10,18 @@
  */
 
 export { BlokCtaPenutup } from "./blok-cta-penutup";
+export { BlokParagraf } from "./blok-paragraf";
 export { BlokSectionTambahan } from "./section-tambahan";
+export { DaftarBukti } from "./daftar-bukti";
 export { DaftarFaq } from "./daftar-faq";
 export { DaftarLangkah } from "./daftar-langkah";
+export { DaftarMesin } from "./daftar-mesin";
 export { DaftarPaket } from "./daftar-paket";
 export { DaftarPoin } from "./daftar-poin";
 export { DaftarTanda } from "./daftar-tanda";
 export { HalamanPricing } from "./halaman-pricing";
 export { HalamanProduk } from "./halaman-produk";
+export { HalamanTentang } from "./halaman-tentang";
 export { HeroHalaman } from "./hero-halaman";
 export { KepalaSection } from "./kepala-section";
 export { KolomUntukSiapa } from "./kolom-untuk-siapa";
