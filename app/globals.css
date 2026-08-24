@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/* Design tokens BCT — JANGAN tambah warna di luar token ini (lihat CLAUDE.md) */
+:root {
+  --bg: #f6f5f1;
+  --surface: #fcfcfb;
+  --surface-2: #efeee8;
+  --ink: #191813;
+  --ink-2: #54524c;
+  --muted: #8b8880;
+  --line: #e3e1d8;
+  --accent: #96660f;
+  --accent-soft: rgba(150, 102, 15, 0.09);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0d0b;
+    --surface: #1a1a19;
+    --surface-2: #232320;
+    --ink: #f2f0e9;
+    --ink-2: #c3c2b7;
+    --muted: #8b8880;
+    --line: #2c2c2a;
+    --accent: #d9a84e;
+    --accent-soft: rgba(217, 168, 78, 0.10);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --font-display: var(--font-bricolage);
+  --font-body: var(--font-figtree);
+  --font-mono: var(--font-plex-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-bricolage), var(--font-figtree), sans-serif;
+  text-wrap: balance;
+  line-height: 1.15;
+}
