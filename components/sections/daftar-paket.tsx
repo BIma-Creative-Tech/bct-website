@@ -1,3 +1,4 @@
+import { kelas } from "@/components/styles";
 import { WaButton } from "@/components/wa-button";
 import type { Paket } from "@/content/site";
 import { DaftarTanda } from "./daftar-tanda";
@@ -12,15 +13,38 @@ import { DaftarTanda } from "./daftar-tanda";
  * `ctaPesan` tanpa label tombol — lihat catatan untuk owner di laporan W2-01.
  * Karena tombolnya berulang, pembedanya ditaruh di aria-label (nama paket dari site.ts).
  */
-export function DaftarPaket({ paket, labelCta }: { paket: Paket[]; labelCta: string }) {
+export function DaftarPaket({
+  paket,
+  labelCta,
+  levelJudul = "h3",
+  className = "mt-10",
+}: {
+  paket: Paket[];
+  labelCta: string;
+  /**
+   * Tingkat heading nama paket. Default "h3" (dipasang langsung di bawah <h2>
+   * section, seperti di halaman produk). Naikkan ke "h4" bila kartu berada di bawah
+   * judul kelompok <h3> — dipakai /pricing yang mengelompokkan paket per produk,
+   * supaya urutan heading tidak jadi datar.
+   */
+  levelJudul?: "h3" | "h4";
+  /**
+   * Kelas pembungkus <ul>. Default "mt-10" (jarak standar dari kepala section).
+   * Diisi pemanggil bila jarak atasnya perlu berbeda — sengaja MENGGANTI, bukan
+   * menambah, agar tidak ada dua utilitas margin yang saling bertabrakan.
+   */
+  className?: string;
+}) {
+  const JudulPaket = levelJudul;
+
   return (
-    <ul className="mt-10 grid gap-4 sm:grid-cols-2">
+    <ul className={kelas("grid gap-4 sm:grid-cols-2", className)}>
       {paket.map((item) => (
         <li
           key={item.nama}
           className="flex flex-col rounded-2xl border border-line bg-surface p-6 sm:p-8"
         >
-          <h3 className="font-display text-xl font-bold text-ink">{item.nama}</h3>
+          <JudulPaket className="font-display text-xl font-bold text-ink">{item.nama}</JudulPaket>
 
           <p className="mt-4 font-mono text-2xl font-semibold text-ink">
             {item.harga}

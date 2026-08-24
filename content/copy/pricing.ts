@@ -25,7 +25,7 @@ export type PricingCopy = {
   rateCardPdf: {
     kepala: KepalaSection;
     label: string;
-    /** File belum ada di repo — lihat [TANYA-OWNER] di bawah. */
+    /** Berkas belum ada di repo; blok ini belum dirender — lihat catatan STATUS di bawah (W2-11). */
     href: string;
   };
   faq: {
@@ -50,9 +50,14 @@ export const pricing: PricingCopy = {
       label: "Tanya harga untuk kebutuhan saya",
       pesan: "Halo BCT, saya sudah lihat rate card. Bisa bantu perkirakan angkanya untuk kebutuhan saya?",
     },
+    // SEMENTARA (W2-02): aslinya { label: "Lihat cara kerja kami", href: "/tentang" }.
+    // Rute /tentang belum ada (404) sampai W2-04 selesai, jadi CTA ini dialihkan ke
+    // beranda — satu-satunya halaman hidup yang merangkum ketiga lini layanan untuk
+    // pengunjung yang mendarat langsung di halaman harga.
+    // KEMBALIKAN ke label + href asli begitu W2-04 (halaman /tentang) selesai.
     sekunder: {
-      label: "Lihat cara kerja kami",
-      href: "/tentang",
+      label: "Lihat ringkasan tiga layanan kami",
+      href: "/",
     },
   },
 
@@ -108,9 +113,15 @@ export const pricing: PricingCopy = {
       teks: "Rate card lengkap tersedia dalam satu berkas PDF, isinya sama persis dengan halaman ini.",
     },
     label: "Unduh rate card (PDF)",
-    // [TANYA-OWNER] Berkas PDF rate card belum ada di repo. Owner perlu menyediakannya
-    // (mis. /public/rate-card-bct.pdf) atau memutuskan tombol ini disembunyikan dulu.
-    // Terkait checklist W2-02 dan DoD situs ("rate card PDF bisa diunduh").
+    // STATUS (keputusan owner 2026-08-25, saat W2-02): blok ini sengaja TIDAK dirender
+    // oleh app/pricing/page.tsx sampai berkas `public/rate-card-bct.pdf` disediakan
+    // owner — berkasnya belum ada di repo, dan tombol unduh yang menunjuk berkas kosong
+    // lebih merugikan daripada tidak ada tombol sama sekali.
+    //
+    // JANGAN HAPUS field ini meski untuk sementara nol pemakai: copy dan tipenya sudah
+    // final, tinggal disambungkan begitu berkasnya masuk. Penyambungan dilacak sebagai
+    // item checklist tersendiri, W2-11 di docs/checklist.md, dan wajib selesai sebelum
+    // rilis karena "rate card PDF bisa diunduh" ada di Definition of Done situs.
     href: "/rate-card-bct.pdf",
   },
 
@@ -150,9 +161,15 @@ export const pricing: PricingCopy = {
       label: "Minta perkiraan via WhatsApp",
       pesan: "Halo BCT, saya ingin minta perkiraan harga sesuai kebutuhan bisnis saya.",
     },
+    // SEMENTARA (W2-02): aslinya { label: "Lihat studi kasus", href: "/studi-kasus" }.
+    // Rute /studi-kasus belum ada (404) sampai W2-03 selesai. Pengalihan ke halaman Odoo
+    // dipilih karena paragraf penutup ini soal scope yang menentukan angka, dan Odoo
+    // punya rentang terlebar di rate card — halamannya menjelaskan pemetaan proses yang
+    // menentukan posisi klien di rentang itu.
+    // KEMBALIKAN ke label + href asli begitu W2-03 (halaman /studi-kasus) selesai.
     sekunder: {
-      label: "Lihat studi kasus",
-      href: "/studi-kasus",
+      label: "Lihat rincian implementasi Odoo",
+      href: "/produk/odoo",
     },
   },
 };

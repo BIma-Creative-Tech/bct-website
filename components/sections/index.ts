@@ -16,11 +16,14 @@ export { DaftarLangkah } from "./daftar-langkah";
 export { DaftarPaket } from "./daftar-paket";
 export { DaftarPoin } from "./daftar-poin";
 export { DaftarTanda } from "./daftar-tanda";
+export { HalamanPricing } from "./halaman-pricing";
 export { HalamanProduk } from "./halaman-produk";
 export { HeroHalaman } from "./hero-halaman";
 export { KepalaSection } from "./kepala-section";
 export { KolomUntukSiapa } from "./kolom-untuk-siapa";
+export { PaketPerProduk } from "./paket-per-produk";
 export { SectionHalaman } from "./section-halaman";
+export { metadataHalaman } from "./metadata-halaman";
 export { metadataProduk } from "./metadata-produk";
 export {
   kelasBarisTombol,
