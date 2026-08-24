@@ -5,6 +5,8 @@ Website resmi PT Bima Creative Tech (BCT) — company profile, katalog produk, d
 - **Mulai dari `CLAUDE.md`** — seluruh konteks, design system, backlog, dan aturan kerja ada di sana (repo ini didesain untuk dikerjakan dengan Claude Code).
 - Konteks bisnis: `docs/flight-plan.md` dan `docs/build-plan.md`.
 - Data produk/harga/kontak: `content/site.ts` (satu-satunya sumber kebenaran).
+- Copy halaman (teks Bahasa Indonesia): `content/copy/`, diimpor lewat barrel `@/content/copy` — angka harga dan kontak tidak diduplikasi di sana.
+- Komponen UI bersama (nav, footer, tombol WhatsApp, skip link): `components/`.
 
 ## Menjalankan
 
@@ -16,5 +18,7 @@ npm run dev   # http://localhost:3000
 ## Deploy
 
 Vercel (production branch: `main`). Env yang dibutuhkan: `NEXT_PUBLIC_UMAMI_SRC`, `NEXT_PUBLIC_UMAMI_ID` (opsional sampai Umami terpasang).
+
+Sebelum deploy production: ganti `site.domain` di `content/site.ts` dari `http://localhost:3000` ke domain final — canonical dan OG image mengikuti nilai itu.
 
 © PT Bima Creative Tech. Seluruh hak cipta — bukan open source.

@@ -11,7 +11,7 @@ Website company profile + aset jualan BCT. **Tujuan tunggal halaman apa pun: men
 ## Stack
 
 - Next.js (App Router) + TypeScript strict + Tailwind CSS v4 (`@tailwindcss/postcss`).
-- Konten = file TS/MDX di `content/` — TIDAK ada CMS. Data produk & harga di `content/site.ts` adalah **satu-satunya sumber kebenaran** untuk nama paket, harga, dan CTA; komponen tidak boleh hardcode angka harga.
+- Konten = file TS/MDX di `content/` — TIDAK ada CMS. Copy per halaman di `content/copy/` (bertipe, diimpor lewat `@/content/copy`). Data produk & harga di `content/site.ts` adalah **satu-satunya sumber kebenaran** untuk nama paket, harga, dan CTA; komponen tidak boleh hardcode angka harga.
 - Deploy: Vercel. Analytics: Umami (script di layout, env `NEXT_PUBLIC_UMAMI_*`; jangan pakai Google Analytics).
 - Tidak ada komponen library berat (shadcn boleh dipetik per-komponen bila perlu). Tidak ada state management library.
 
@@ -44,7 +44,7 @@ Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token dide
 
 | Route | Halaman | Status |
 |---|---|---|
-| `/` | Beranda: proposisi + 3 produk + bukti + CTA WA | scaffold |
+| `/` | Beranda: proposisi + 3 produk + bukti + CTA WA | beranda utuh (W1-03) — status mutakhir di `docs/checklist.md` |
 | `/produk/bima-insight` | Bima Insight | belum |
 | `/produk/odoo` | Implementasi Odoo + Odoo Care | belum |
 | `/produk/web-apps` | Paket web & custom apps | belum |

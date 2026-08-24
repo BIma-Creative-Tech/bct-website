@@ -22,17 +22,18 @@ Alur status: `⬜ TODO` → `🔨 IN PROGRESS` → `🧪 REVIEW` (qa-reviewer) �
 | G-08 | Release workflow (tag v* → image GHCR) | devops-engineer | 🟨 KONFIRMASI-OWNER | uji saat rilis v0.1.0 |
 | G-09 | CHANGELOG + SECURITY.md + decisions.md | docs-keeper | 🟨 KONFIRMASI-OWNER | 2026-08-24 |
 | G-10 | Push repo ke GitHub + CI hijau pertama | **owner** | ⬜ TODO | dari komputer owner (lihat instruksi sesi Cowork) |
-| G-11 | Isi data resmi: nomor WA, email, domain di content/site.ts | **owner** | ⬜ TODO | 3 TODO tertanda di file |
+| G-11 | Isi data resmi: nomor WA, email, domain di content/site.ts | **owner** | 🟨 KONFIRMASI-OWNER | QA: 3 TODO hilang, `waLink()` render `wa.me/6285640718785?text=` di HTML, `new URL(site.domain)` build hijau, grep repo: kontak hanya di content/site.ts; domain `http://localhost:3000` MASIH SEMENTARA sampai W3-04; owner konfirmasi nilai email, 2026-08-24 |
 | G-12 | Setup project Vercel + env dari .env.example | owner + devops-engineer | ⬜ TODO | |
+| G-13 | ESLint flat config (`eslint.config.mjs`) agar `npm run lint` hijau | devops-engineer | 🟨 KONFIRMASI-OWNER | QA: `npm run lint` exit 0, 27 file dilint (app+components+content) 0 error/warning, config tidak mematikan rule apa pun, `react/jsx-no-target-blank`=error terbukti menyala pada file uji, diff package.json/lock kosong, 2026-08-24 |
 
 ## W1 — Struktur & Copy (target: minggu ke-1 Sep 2026, ±8 jam)
 
 | ID | Tugas | Pemilik | Status | Bukti/Catatan |
 |---|---|---|---|---|
-| W1-01 | Copywriting semua halaman di content/ (beranda, 3 produk, pricing, tentang) | content-writer | ⬜ TODO | DoD: tanpa placeholder; daftar [TANYA-OWNER] dilaporkan |
-| W1-02 | Komponen layout: Nav + Footer + tombol WA floating | frontend-builder | ⬜ TODO | DoD: responsive, dark mode, fokus keyboard |
-| W1-03 | Beranda final (hero, produk, bukti, CTA) | frontend-builder | ⬜ TODO | DoD: Lighthouse mobile ≥ 90 |
-| W1-04 | Review W1: copy + UI + konsistensi harga | qa-reviewer | ⬜ TODO | |
+| W1-01 | Copywriting semua halaman di content/ (beranda, 3 produk, pricing, tentang) | content-writer | 🟨 KONFIRMASI-OWNER | QA: 11 file, nihil lorem/placeholder liar, nihil jargon terlarang, nihil harga/kontak diketik ulang, 17 `[TANYA-OWNER]` semuanya komentar & tidak muncul di HTML render; 8 klaim faktual (DP 50%, kontrak 6 bln, diskon 20%, demo 15 mnt, KOMDIGI, read-only/SELECT-only, PostgreSQL+MySQL, 3 mesin) tertelusur ke docs/flight-plan.md & docs/build-plan.md, 2026-08-24 |
+| W1-02 | Komponen layout: Nav + Footer + tombol WA floating | frontend-builder | 🟨 KONFIRMASI-OWNER | QA: build+lint+tsc hijau, `git diff app/globals.css` kosong & CSS terkompilasi hanya memuat 15 token resmi (nihil hex/text-gray/bg-white/`dark:`), dark mode via media query aktif, fokus ring tersusun benar (skip link tampil saat fokus), skip link → `#konten-utama`, `aria-expanded`+`aria-controls` menunjuk id yang ada, semua SVG `aria-hidden`, WA mengambang ber-`aria-label`, WA hanya lewat `waLink()`, 0 dependensi baru, 2026-08-24 |
+| W1-03 | Beranda final (hero, produk, bukti, CTA) | frontend-builder | 🟨 KONFIRMASI-OWNER | QA ulang: lint/build/tsc exit 0; HTML dari `next start` terbit `<title>Sistem bisnis untuk UKM Indonesia — Bima Creative Tech</title>` (sufiks tunggal, tidak dobel), `og:title` + `twitter:title` identik dengan itu, judul fallback rute tak dikenal `Sistem bisnis modern untuk UKM Indonesia — Bima Creative Tech`; nihil regresi: tepat 1 `<h1>`, `description`/`canonical`/`metadataBase` tetap terbit, nol literal nama merek di app/page.tsx & app/layout.tsx (semua dari `site.name`), `content/copy/beranda.ts` tidak tersentuh, harga render Rp 2,5 jt / Rp 25–75 jt / Rp 5–15 jt = content/site.ts:51,76,100, 2026-08-24 |
+| W1-04 | Review W1: copy + UI + konsistensi harga | qa-reviewer | 🟨 KONFIRMASI-OWNER | QA 2026-08-24: seluruh item W1 lulus — G-11, G-13, W1-01, W1-02 tetap 🟨 dan W1-03 lulus verifikasi ulang setelah sufiks `<title>` diperbaiki; `npm run lint` / `npm run build` / `npx tsc --noEmit` exit 0, `node scripts/check-governance.mjs` OK, CHANGELOG [Unreleased] mencatat content/copy/, components/, eslint.config.mjs, content/site.ts, app/page.tsx, app/layout.tsx; nihil status SELESAI ditulis agent (grep docs/, CHANGELOG, CLAUDE, README hanya menemukan penjelasan alur status). Di luar cakupan W1 dan tetap dilacak terpisah: domain produksi W3-04, Lighthouse W3-01/W3-03 |
 
 ## W2 — Semua Halaman (minggu ke-2, ±10 jam)
 
@@ -51,7 +52,7 @@ Alur status: `⬜ TODO` → `🔨 IN PROGRESS` → `🧪 REVIEW` (qa-reviewer) �
 
 | ID | Tugas | Pemilik | Status | Bukti/Catatan |
 |---|---|---|---|---|
-| W3-01 | SEO: metadata semua halaman, sitemap.xml, robots.txt, OG image | frontend-builder | ⬜ TODO | |
+| W3-01 | SEO: metadata semua halaman, sitemap.xml, robots.txt, OG image | frontend-builder | ⬜ TODO | Termasuk: OG image belum ada (sengaja tidak dikarang di W1) dan `app/not-found.tsx` bermetadata sendiri — halaman 404 bawaan Next menerbitkan `<title>` kedua. Pengukuran Lighthouse dipindah ke sini + W3-03 |
 | W3-02 | Pasang Umami di VPS + env production | devops-engineer + owner | ⬜ TODO | |
 | W3-03 | Uji aksesibilitas + mobile nyata (HP owner) | qa-reviewer + owner | ⬜ TODO | |
 | W3-04 | Deploy production Vercel + domain + DNS | owner + devops-engineer | ⬜ TODO | **gerbang konfirmasi owner sebelum go-live** |

@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Figtree, IBM_Plex_Mono } from "next/font/google";
+import { SiteFooter } from "@/components/site-footer";
+import { SiteNav } from "@/components/site-nav";
+import { SkipLink } from "@/components/skip-link";
+import { WaFloatingButton } from "@/components/wa-floating-button";
 import { site } from "@/content/site";
 import "./globals.css";
 
@@ -21,7 +25,7 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: `${site.name} — Sistem bisnis modern untuk UKM Indonesia`,
+    default: `Sistem bisnis modern untuk UKM Indonesia — ${site.name}`,
     template: `%s — ${site.name}`,
   },
   description: site.tagline,
@@ -33,7 +37,17 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="id" className={`${bricolage.variable} ${figtree.variable} ${plexMono.variable}`}>
-      <body>{children}</body>
+      <body className="flex min-h-dvh flex-col">
+        <SkipLink />
+        <SiteNav />
+        {/* tabIndex={-1} agar skip link benar-benar memindahkan fokus, bukan
+            hanya menggulirkan halaman. */}
+        <main id="konten-utama" tabIndex={-1} className="flex-1 focus:outline-none">
+          {children}
+        </main>
+        <SiteFooter />
+        <WaFloatingButton />
+      </body>
     </html>
   );
 }
