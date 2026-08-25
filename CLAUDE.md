@@ -45,14 +45,14 @@ Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token dide
 | Route | Halaman | Status |
 |---|---|---|
 | `/` | Beranda: proposisi + 3 produk + bukti + CTA WA | beranda utuh (W1-03) — status mutakhir di `docs/checklist.md` |
-| `/produk/bima-insight` | Bima Insight | belum |
-| `/produk/odoo` | Implementasi Odoo + Odoo Care | belum |
-| `/produk/web-apps` | Paket web & custom apps | belum |
-| `/pricing` | Rate card lengkap (default + custom "mulai dari") | belum |
-| `/studi-kasus` | KOMDIGI e-Telekomunikasi + retail | belum |
-| `/tentang` | Sejarah BCT, cara kerja, tiga mesin | belum |
-| `/insight` | Blog/artikel pendek (MDX) | belum |
-| `/kontak` | Form lead + WA | belum |
+| `/produk/bima-insight` | Bima Insight | hidup (W2-01) |
+| `/produk/odoo` | Implementasi Odoo + Odoo Care | hidup (W2-01) |
+| `/produk/web-apps` | Paket web & custom apps | hidup (W2-01) |
+| `/pricing` | Rate card lengkap (default + custom "mulai dari") | hidup (W2-02); tombol unduh PDF belum (W2-11) |
+| `/studi-kasus` | KOMDIGI e-Telekomunikasi + retail | belum (W2-03) — tertahan menunggu fakta proyek dari owner |
+| `/tentang` | Sejarah BCT, cara kerja, tiga mesin | hidup (W2-04) |
+| `/insight` | Blog/artikel pendek (MDX) | belum (W2-06) |
+| `/kontak` | Form lead + WA | hidup (W2-05); form membalas 503 sampai `LEAD_WEBHOOK_URL` diisi (G-17) |
 
 ## Backlog sprint (kerjakan berurutan)
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { BATAS_ISIAN } from "./batas";
 
 /**
  * Endpoint form lead — dikeraskan setelah audit keamanan (G-05).
@@ -236,10 +237,16 @@ function amanUntukSpreadsheet(nilai: string): string {
 // ————————————————————————————————————————————————————————————————
 // Skema
 // ————————————————————————————————————————————————————————————————
+// Angka batasnya ada di ./batas.ts, BUKAN di sini: form /kontak memakai angka yang
+// sama persis untuk minLength, pemeriksaan panjang di browser, dan pengisian token
+// {maks} di copy. (maxLength sengaja tidak dipakai — lihat aturan 8 di form-kontak.tsx.)
+// Dua salinan angka = klien dan server melenceng diam-diam. Berkasnya sengaja
+// terpisah dari route ini supaya form tidak ikut menarik zod + next/server ke
+// bundel browser (alasan lengkap ada di ./batas.ts).
 const LeadSchema = z.object({
-  nama: satuBaris(2, 100),
-  kontak: satuBaris(5, 100), // email atau nomor WA
-  pesan: banyakBaris(10, 2_000),
+  nama: satuBaris(BATAS_ISIAN.nama.min, BATAS_ISIAN.nama.maks),
+  kontak: satuBaris(BATAS_ISIAN.kontak.min, BATAS_ISIAN.kontak.maks), // email atau nomor WA
+  pesan: banyakBaris(BATAS_ISIAN.pesan.min, BATAS_ISIAN.pesan.maks),
   // Harus persis sama dengan `OpsiProduk` di content/copy/kontak.ts.
   produk: z.enum(["bima-insight", "odoo", "web-apps", "lainnya"]).optional(),
   // Honeypot "website". SENGAJA menerima nilai apa pun: skema yang menolak
