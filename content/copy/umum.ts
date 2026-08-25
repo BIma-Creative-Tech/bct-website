@@ -1,3 +1,4 @@
+import type { SlugProduk } from "../site";
 import type { CtaWa } from "./types";
 
 /**
@@ -16,8 +17,8 @@ export type ItemNav = {
 };
 
 export type ItemNavProduk = {
-  /** Cocok dengan `slug` di `produk[]` pada content/site.ts. */
-  slug: "bima-insight" | "odoo" | "web-apps";
+  /** Diturunkan dari `produk[]` di content/site.ts — lihat aturan 6 di ./types.ts. */
+  slug: SlugProduk;
   href: string;
   /** Penjelas satu baris di menu; nama produknya diambil dari site.ts. */
   subLabel: string;

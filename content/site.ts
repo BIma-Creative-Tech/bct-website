@@ -21,24 +21,50 @@ export function waLink(message: string): string {
   return `https://wa.me/${site.whatsappNumber}?text=${encodeURIComponent(message)}`;
 }
 
+/**
+ * `readonly` di seluruh field bukan gaya-gayaan: `produk` di bawah dideklarasikan
+ * `as const` (lihat alasannya di sana), sehingga nilainya bertipe deeply readonly.
+ * Kedua tipe ini harus ikut readonly agar `satisfies` di bawah tetap cocok, dan
+ * agar komponen yang menerima potongan datanya tidak menjanjikan bisa memutasinya.
+ */
 export type Paket = {
-  nama: string;
-  harga: string;
-  satuan?: string;
-  deskripsi: string;
-  fitur: string[];
-  ctaPesan: string; // pesan prefill WhatsApp
+  readonly nama: string;
+  readonly harga: string;
+  readonly satuan?: string;
+  readonly deskripsi: string;
+  readonly fitur: readonly string[];
+  readonly ctaPesan: string; // pesan prefill WhatsApp
 };
 
 export type Produk = {
-  slug: string;
-  nama: string;
-  ringkas: string;
-  deskripsi: string;
-  paket: Paket[];
+  readonly slug: string;
+  readonly nama: string;
+  readonly ringkas: string;
+  readonly deskripsi: string;
+  readonly paket: readonly Paket[];
 };
 
-export const produk: Produk[] = [
+/**
+ * `as const satisfies readonly Produk[]`, BUKAN `: Produk[]` — dua efek yang
+ * dibutuhkan sekaligus:
+ *
+ * 1. `satisfies` tetap memeriksa setiap entri terhadap bentuk `Produk`, jadi field
+ *    yang kurang atau salah tipe tetap ditolak compiler seperti sebelumnya.
+ * 2. `as const` menahan literal `slug` agar tidak melebar jadi `string`, sehingga
+ *    `SlugProduk` di bawah bisa DITURUNKAN dari data ini.
+ *
+ * Kenapa penting (W2-10 butir b, temuan qa-reviewer 2026-08-26): selama `slug`
+ * bertipe `string`, union slug di `content/copy/types.ts` ditulis tangan dan tidak
+ * terhubung ke berkas ini — produk keempat bisa ditambahkan TANPA copy dan build
+ * tetap hijau, lalu produk tanpa copy itu ikut terender ke beranda dan /pricing.
+ * Dengan bentuk sekarang, `produkCopy: Record<SlugProduk, ProdukCopy>` di
+ * `content/copy/index.ts` langsung gagal (TS2741) menyebut slug yang copy-nya hilang.
+ *
+ * Konsekuensi yang harus dipatuhi: nilai di sini hanya boleh dibaca. Komponen yang
+ * menerima `produk[].paket` atau `paket[].fitur` mendeklarasikan prop-nya sebagai
+ * `readonly` (mis. components/sections/daftar-paket.tsx, daftar-tanda.tsx).
+ */
+export const produk = [
   {
     slug: "bima-insight",
     nama: "Bima Insight",
@@ -111,7 +137,18 @@ export const produk: Produk[] = [
       },
     ],
   },
-];
+] as const satisfies readonly Produk[];
+
+/**
+ * Union slug produk — DITURUNKAN dari `produk` di atas, jangan pernah ditulis ulang.
+ *
+ * Ini pengikat antara sumber kebenaran (berkas ini) dan copy: `ProdukCopy["slug"]`
+ * di `content/copy/types.ts` dan `ItemNavProduk["slug"]` di `content/copy/umum.ts`
+ * memakai tipe ini, sehingga menambah/menghapus produk di sini otomatis menuntut
+ * copy dan item nav-nya menyusul — ketahuan saat `tsc`/`next build`, bukan saat
+ * pengunjung melihat produk tanpa halaman.
+ */
+export type SlugProduk = (typeof produk)[number]["slug"];
 
 export const bukti = [
   { angka: "10+ tahun", label: "pengalaman industri IT & enterprise apps" },

@@ -58,14 +58,19 @@ export type { TidakDitemukanCopy } from "./tidak-ditemukan";
  * `bimaInsight` / `odoo` / `webApps` langsung. Rute `/produk/[slug]` tidak pernah dibuat
  * dan tidak akan dibuat.
  *
- * STATUS: nol pemakai di seluruh repo per 2026-08-25 (dipertahankan, bukan terlupakan).
- * Peta ini baru berguna bila kelak ada halaman yang harus memilih copy produk dari slug
- * yang tidak diketahui saat menulis kode — misalnya daftar/pembanding produk, pencarian,
- * atau tautan produk yang datang dari data. Selama tiga rute literal itu bertahan,
- * konsumennya memang tidak ada.
+ * STATUS: nol pemakai runtime (dipertahankan, bukan terlupakan). Peta ini baru berguna
+ * bila kelak ada halaman yang harus memilih copy produk dari slug yang tidak diketahui
+ * saat menulis kode — misalnya daftar/pembanding produk, pencarian, atau tautan produk
+ * yang datang dari data. Selama tiga rute literal itu bertahan, konsumennya memang tidak ada.
  *
- * Hapus-atau-pertahankan = keputusan owner (dilacak sebagai W2-10 di `docs/checklist.md`),
- * karena menghapus ekspor publik berisiko memecah build.
+ * TAPI IA PUNYA TUGAS SAAT KOMPILASI, dan sejak W2-10 butir (b) tugas itu nyata:
+ * `ProdukCopy["slug"]` kini = `SlugProduk`, yang DITURUNKAN dari `produk[]` di
+ * `content/site.ts` (`as const`), bukan union tulis tangan seperti sebelumnya. Akibatnya
+ * `Record<...>` di bawah wajib total terhadap isi `produk[]`: menambahkan produk keempat
+ * di content/site.ts tanpa menulis copy-nya membuat `tsc` dan `next build` GAGAL dengan
+ * TS2741 yang menyebut slug-nya. Sebelum perbaikan itu, skenario yang sama lolos (tsc &
+ * build exit 0) dan produk tanpa copy diam-diam terender ke beranda serta /pricing —
+ * diukur qa-reviewer 2026-08-26. Jangan hapus ekspor ini tanpa mengganti jaringnya.
  */
 export const produkCopy: Record<ProdukCopy["slug"], ProdukCopy> = {
   "bima-insight": bimaInsight,

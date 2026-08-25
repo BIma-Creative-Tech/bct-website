@@ -3,6 +3,7 @@ import { LinkButton } from "@/components/link-button";
 import { kelas, wadah } from "@/components/styles";
 import { WaButton } from "@/components/wa-button";
 import type { HeroCopy } from "@/content/copy";
+import { tautanHidup } from "@/content/rute";
 import { kelasBarisTombol } from "./kelas-section";
 
 /**
@@ -12,6 +13,9 @@ import { kelasBarisTombol } from "./kelas-section";
  * `eyebrow` menerima string jadi (mis. hasil gabungan `hero.eyebrow` dengan
  * `produk[].nama` atau `site.location`) — komponen tidak menyusun teks sendiri.
  * `catatan` opsional untuk catatan status produk (mis. `catatanStatus` pada copy).
+ *
+ * TAUTAN SEKUNDER (W2-12): disaring `tautanHidup()` dari content/rute.ts — sama
+ * seperti <BlokCtaPenutup>. Tombol kedua tidak pernah menuju rute yang belum ada.
  */
 export function HeroHalaman({
   hero,
@@ -25,6 +29,8 @@ export function HeroHalaman({
   eyebrow?: string;
   catatan?: string;
 }) {
+  const sekunder = tautanHidup(hero.sekunder);
+
   return (
     <section aria-labelledby={idJudul} className={kelas(wadah, "py-16 sm:py-24")}>
       <Eyebrow>{eyebrow ?? hero.eyebrow}</Eyebrow>
@@ -39,9 +45,7 @@ export function HeroHalaman({
       ) : null}
       <div className={kelasBarisTombol}>
         <WaButton pesan={hero.primer.pesan}>{hero.primer.label}</WaButton>
-        {hero.sekunder ? (
-          <LinkButton href={hero.sekunder.href}>{hero.sekunder.label}</LinkButton>
-        ) : null}
+        {sekunder ? <LinkButton href={sekunder.href}>{sekunder.label}</LinkButton> : null}
       </div>
     </section>
   );

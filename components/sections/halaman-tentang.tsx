@@ -1,4 +1,7 @@
+import Link from "next/link";
+import { tautanTeks } from "@/components/styles";
 import type { TentangCopy } from "@/content/copy";
+import { tautanHidup } from "@/content/rute";
 import { BlokCtaPenutup } from "./blok-cta-penutup";
 import { BlokParagraf } from "./blok-paragraf";
 import { DaftarBukti } from "./daftar-bukti";
@@ -22,7 +25,11 @@ import { SectionHalaman } from "./section-halaman";
  * `bg-surface` (prinsip, lewat <DaftarPoin>) sengaja jatuh di latar `bg` supaya
  * kartunya tidak menyatu dengan pita latar.
  *
- * `copy.rekamJejak.tautan` SENGAJA tidak dirender — alasannya di app/tentang/page.tsx.
+ * `copy.rekamJejak.tautan` dilewatkan `tautanHidup()` (content/rute.ts), penyaring
+ * yang sama dengan nav, footer, dan halaman lain: selama /studi-kasus belum ada
+ * (W2-03) tautannya tidak dirender, dan menyala sendiri begitu rutenya didaftarkan
+ * di berkas itu — tanpa menyunting komponen ini lagi. Sectionnya tetap berisi kepala
+ * + tiga angka bukti, jadi tidak pernah jadi judul kosong.
  */
 
 const ID_JUDUL = {
@@ -36,6 +43,8 @@ const ID_JUDUL = {
 } as const;
 
 export function HalamanTentang({ copy }: { copy: TentangCopy }) {
+  const tautanRekamJejak = tautanHidup(copy.rekamJejak.tautan);
+
   return (
     <>
       <HeroHalaman hero={copy.hero} idJudul={ID_JUDUL.hero} />
@@ -67,11 +76,18 @@ export function HalamanTentang({ copy }: { copy: TentangCopy }) {
       </SectionHalaman>
 
       {/* Rekam jejak: kepala section + angka bukti dari content/site.ts. Tautan
-          "Buka studi kasus" (copy.rekamJejak.tautan) TIDAK dirender selama rute
-          /studi-kasus belum ada — lihat app/tentang/page.tsx. */}
+          `copy.rekamJejak.tautan` hanya tayang bila rutenya terdaftar hidup di
+          content/rute.ts — bentuk tautannya sama dengan tautan bukti di beranda. */}
       <SectionHalaman idJudul={ID_JUDUL.rekamJejak} latar="surface">
         <KepalaSection kepala={copy.rekamJejak.kepala} idJudul={ID_JUDUL.rekamJejak} />
         <DaftarBukti />
+        {tautanRekamJejak ? (
+          <p className="mt-10">
+            <Link href={tautanRekamJejak.href} className={tautanTeks}>
+              {tautanRekamJejak.label}
+            </Link>
+          </p>
+        ) : null}
       </SectionHalaman>
 
       <BlokCtaPenutup cta={copy.penutup} idJudul={ID_JUDUL.penutup} />

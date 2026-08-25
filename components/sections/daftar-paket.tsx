@@ -19,7 +19,8 @@ export function DaftarPaket({
   levelJudul = "h3",
   className = "mt-10",
 }: {
-  paket: Paket[];
+  /** `readonly`: `produk[]` di content/site.ts dideklarasikan `as const`. */
+  paket: readonly Paket[];
   labelCta: string;
   /**
    * Tingkat heading nama paket. Default "h3" (dipasang langsung di bawah <h2>

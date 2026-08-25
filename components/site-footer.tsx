@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { footer, navCta } from "@/content/copy";
+import { saringTautan } from "@/content/rute";
 import { site } from "@/content/site";
 import { fokusRing, kelas, wadah } from "./styles";
 import { WaButton } from "./wa-button";
@@ -7,14 +8,27 @@ import { WaButton } from "./wa-button";
 /**
  * Footer situs (server component).
  *
- * CATATAN TAUTAN: /pricing, /studi-kasus, /tentang, /kontak, dan /produk/* baru
- * dibuat pada sprint W2 — tautan sudah dipasang sesuai sitemap CLAUDE.md dan
- * akan 404 sampai halaman tujuan ada.
+ * CATATAN TAUTAN (W2-12): footer memakai penyaring yang SAMA dengan nav dan
+ * halaman — `saringTautan()` dari content/rute.ts. Hanya rute yang terdaftar
+ * hidup di sana yang ditautkan; /studi-kasus (W2-03) dan /insight (W2-06) menyala
+ * sendiri begitu path-nya ditambahkan di berkas itu. Data footer tetap utuh di
+ * content/copy/umum.ts — jangan menghapus item dari copy.
  *
  * KEAMANAN: `site.email` dan digit nomor WhatsApp TIDAK pernah dirender sebagai
  * teks (hasil audit: email adalah alamat pribadi owner, jangan mudah di-scrape).
  * Satu-satunya jalur kontak di footer adalah tombol WhatsApp lewat waLink().
  */
+
+/**
+ * Grup yang seluruh tautannya menuju rute mati DIBUANG, bukan dirender sebagai
+ * judul tanpa isi. Per 2026-08-26 tidak ada grup yang jatuh ke kondisi itu
+ * (grup "Perusahaan" menyisakan Tentang, Harga, Kontak); penjagaannya dipasang
+ * supaya penyaringan tidak pernah meninggalkan <h2> kosong di kemudian hari.
+ */
+const grupFooter = footer.grup
+  .map((grup) => ({ judul: grup.judul, item: saringTautan(grup.item) }))
+  .filter((grup) => grup.item.length > 0);
+
 export function SiteFooter() {
   // Server component: dievaluasi saat build/render server, jadi tidak ada
   // perbedaan nilai antara HTML server dan hidrasi klien (hydration mismatch).
@@ -42,7 +56,7 @@ export function SiteFooter() {
             </WaButton>
           </div>
 
-          {footer.grup.map((grup, indeks) => {
+          {grupFooter.map((grup, indeks) => {
             const idJudul = `footer-grup-${indeks}`;
             return (
               <nav key={grup.judul} aria-labelledby={idJudul}>

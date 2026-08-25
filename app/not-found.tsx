@@ -5,6 +5,7 @@ import { SectionHalaman, kelasBarisTombol, kelasJudulSection } from "@/component
 import { fokusRing, kelas } from "@/components/styles";
 import { WaButton } from "@/components/wa-button";
 import { tidakDitemukan } from "@/content/copy";
+import { saringTautan, tautanHidup } from "@/content/rute";
 import { produk, site } from "@/content/site";
 
 /**
@@ -18,10 +19,12 @@ import { produk, site } from "@/content/site";
  * dicocokkan lewat slug (pola yang sama dipakai components/site-nav.tsx). Tidak ada
  * kalimat, nama merek, nomor WhatsApp, atau harga yang diketik di file ini.
  *
- * TAUTAN: section bantu di bawah HANYA menautkan ketiga rute /produk/* yang sudah
- * hidup. /pricing, /studi-kasus, /tentang, /kontak, dan /insight sengaja tidak
- * ditautkan dari sini selama halamannya belum ada — mengirim pengunjung dari 404
- * ke 404. (Nav dan footer masih memuat tautan itu; lihat catatan di site-nav.tsx.)
+ * TAUTAN (W2-12): halaman ini tidak boleh mengirim pengunjung dari 404 ke 404,
+ * jadi setiap tautan disaring `saringTautan()` / `tautanHidup()` dari
+ * content/rute.ts — penyaring yang sama dengan nav, footer, dan halaman lain.
+ * Sebelumnya aturan itu ditulis tangan di sini; sekarang daftar rute hidupnya
+ * cuma ada di content/rute.ts. `tidakDitemukan.sekunder` menuju "/" yang selalu
+ * terdaftar hidup, jadi jalan pulang pengunjung tidak pernah hilang.
  */
 
 /**
@@ -78,10 +81,12 @@ const ID_JUDUL = {
 
 /** Nama produk diambil dari content/site.ts lewat slug; subLabel dari content/copy.
  *  flatMap dipakai agar slug yang tidak ada di site.ts dilewati, bukan dirender kosong. */
-const tautanProduk = tidakDitemukan.tautanBantu.flatMap((item) => {
+const tautanProduk = saringTautan(tidakDitemukan.tautanBantu).flatMap((item) => {
   const data = produk.find((p) => p.slug === item.slug);
   return data ? [{ slug: item.slug, href: item.href, nama: data.nama, subLabel: item.subLabel }] : [];
 });
+
+const tautanPulang = tautanHidup(tidakDitemukan.sekunder);
 
 export default function TidakDitemukan() {
   return (
@@ -99,7 +104,9 @@ export default function TidakDitemukan() {
         <p className="mt-6 max-w-[65ch] text-lg text-ink-2">{tidakDitemukan.teks}</p>
         <div className={kelasBarisTombol}>
           <WaButton pesan={tidakDitemukan.primer.pesan}>{tidakDitemukan.primer.label}</WaButton>
-          <LinkButton href={tidakDitemukan.sekunder.href}>{tidakDitemukan.sekunder.label}</LinkButton>
+          {tautanPulang ? (
+            <LinkButton href={tautanPulang.href}>{tautanPulang.label}</LinkButton>
+          ) : null}
         </div>
       </SectionHalaman>
 

@@ -5,7 +5,8 @@ import { LinkButton } from "@/components/link-button";
 import { fokusRing, kelas, tautanTeks, wadah } from "@/components/styles";
 import { WaButton } from "@/components/wa-button";
 import { beranda } from "@/content/copy";
-import { bukti, produk, site } from "@/content/site";
+import { tautanHidup } from "@/content/rute";
+import { bukti, produk, site, type Paket } from "@/content/site";
 
 /**
  * Beranda.
@@ -14,8 +15,14 @@ import { bukti, produk, site } from "@/content/site";
  * harga, lokasi, dan nomor WhatsApp dari content/site.ts. Tidak ada satu pun
  * angka harga, nomor WA, atau email yang ditulis di file ini.
  *
- * Tautan /pricing, /studi-kasus, dan /produk/* menuju halaman yang baru dibuat
- * pada sprint W2 (sitemap CLAUDE.md) — sengaja sudah dipasang.
+ * TAUTAN (W2-12): ketiga tautan copy di halaman ini dilewatkan `tautanHidup()`
+ * dari content/rute.ts, penyaring yang sama dengan nav, footer, <HeroHalaman>,
+ * dan <BlokCtaPenutup>. `beranda.bukti.tautan` ("Lihat studi kasus") karena itu
+ * TIDAK tayang selama /studi-kasus belum ada — section rekam jejak tetap berisi
+ * kepala + tiga angka bukti, jadi tidak ada judul kosong (preseden ADR 2026-08-25).
+ * Copy-nya dibiarkan utuh dan menyala sendiri saat W2-03 mendaftarkan rutenya.
+ * Kartu /produk/* dirender dari `produk[].slug` (content/site.ts), rutenya literal
+ * dan sudah hidup, jadi tidak lewat penyaring.
  */
 export const metadata: Metadata = {
   // `title.template` di app/layout.tsx HANYA berlaku untuk segmen anak, bukan
@@ -50,6 +57,10 @@ const daftarBukti = bukti.map((item, indeks) => ({
   detail: beranda.bukti.detail.at(indeks)?.teks,
 }));
 
+const heroSekunder = tautanHidup(beranda.hero.sekunder);
+const tautanBukti = tautanHidup(beranda.bukti.tautan);
+const penutupSekunder = tautanHidup(beranda.penutup.sekunder);
+
 const kelasJudulSection = "mt-5 max-w-[22ch] font-display text-3xl font-extrabold sm:text-4xl";
 const kelasParagrafSection = "mt-4 max-w-[65ch] text-ink-2";
 const kelasBarisTombol = "mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center";
@@ -67,8 +78,8 @@ export default function Home() {
         <p className="mt-6 max-w-[65ch] text-lg text-ink-2">{beranda.hero.teks}</p>
         <div className={kelasBarisTombol}>
           <WaButton pesan={beranda.hero.primer.pesan}>{beranda.hero.primer.label}</WaButton>
-          {beranda.hero.sekunder ? (
-            <LinkButton href={beranda.hero.sekunder.href}>{beranda.hero.sekunder.label}</LinkButton>
+          {heroSekunder ? (
+            <LinkButton href={heroSekunder.href}>{heroSekunder.label}</LinkButton>
           ) : null}
         </div>
       </section>
@@ -85,7 +96,10 @@ export default function Home() {
           {produk.map((item) => {
             // Paket pertama = paket masuk untuk lini ini. Harga TIDAK PERNAH
             // diketik di komponen, selalu dari content/site.ts.
-            const paketMasuk = item.paket.at(0);
+            // Anotasi `Paket | undefined` disengaja: `produk[]` kini `as const`, jadi
+            // tanpa anotasi tipe elemennya menyempit ke objek literal per paket dan
+            // `satuan` (opsional, tidak ada di semua paket) hilang dari union.
+            const paketMasuk: Paket | undefined = item.paket.at(0);
             return (
               <li key={item.slug} className="flex">
                 <Link
@@ -148,11 +162,13 @@ export default function Home() {
           ))}
         </ul>
 
-        <p className="mt-10">
-          <Link href={beranda.bukti.tautan.href} className={tautanTeks}>
-            {beranda.bukti.tautan.label}
-          </Link>
-        </p>
+        {tautanBukti ? (
+          <p className="mt-10">
+            <Link href={tautanBukti.href} className={tautanTeks}>
+              {tautanBukti.label}
+            </Link>
+          </p>
+        ) : null}
       </section>
 
       {/* ---------- Cara kerja ---------- */}
@@ -190,10 +206,8 @@ export default function Home() {
           <p className={kelasParagrafSection}>{beranda.penutup.teks}</p>
           <div className={kelasBarisTombol}>
             <WaButton pesan={beranda.penutup.primer.pesan}>{beranda.penutup.primer.label}</WaButton>
-            {beranda.penutup.sekunder ? (
-              <LinkButton href={beranda.penutup.sekunder.href}>
-                {beranda.penutup.sekunder.label}
-              </LinkButton>
+            {penutupSekunder ? (
+              <LinkButton href={penutupSekunder.href}>{penutupSekunder.label}</LinkButton>
             ) : null}
           </div>
         </div>

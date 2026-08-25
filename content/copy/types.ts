@@ -1,3 +1,5 @@
+import type { SlugProduk } from "../site";
+
 /**
  * Tipe bersama untuk seluruh copy situs BCT.
  *
@@ -12,6 +14,11 @@
  *    dipasang oleh `template` di `app/layout.tsx`.
  * 5. Komentar `[TANYA-OWNER]` = fakta yang belum tersedia. JANGAN pernah
  *    dirender sebagai teks yang dilihat pengunjung.
+ * 6. Slug produk TIDAK ditulis ulang sebagai union literal di sini. Ia diimpor
+ *    sebagai `SlugProduk` dari `content/site.ts` (import type saja — terhapus
+ *    saat kompilasi, jadi nol dampak ke bundel). Union tulis tangan yang dulu ada
+ *    di sini tidak terhubung ke sumber kebenaran: produk keempat bisa masuk ke
+ *    `produk[]` tanpa copy dan build tetap hijau (terukur W2-10 butir b).
  */
 
 /** Metadata halaman Next.js. `title` tanpa suffix, `description` <= 155 karakter. */
@@ -99,8 +106,8 @@ export type SectionTambahan = {
 
 /** Kerangka lengkap satu halaman produk. */
 export type ProdukCopy = {
-  /** Harus sama dengan `slug` di `produk[]` pada content/site.ts. */
-  slug: "bima-insight" | "odoo" | "web-apps";
+  /** Diturunkan dari `produk[]` di content/site.ts — lihat aturan 6 di atas. */
+  slug: SlugProduk;
   meta: MetaCopy;
   hero: HeroCopy;
   /** Catatan status produk (mis. masih pengembangan). Kosongkan bila tidak relevan. */

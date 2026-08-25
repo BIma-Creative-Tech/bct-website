@@ -13,7 +13,8 @@ export function DaftarTanda({
   tanda = "cocok",
   className,
 }: {
-  item: string[];
+  /** `readonly`: menerima `produk[].paket[].fitur` yang deeply readonly (`as const`). */
+  item: readonly string[];
   tanda?: "cocok" | "belum";
   className?: string;
 }) {

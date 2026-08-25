@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { navCta, navProduk, navUtama } from "@/content/copy";
+import { saringTautan } from "@/content/rute";
 import { produk, site } from "@/content/site";
 import { fokusRing, kelas, wadah } from "./styles";
 import { WaButton } from "./wa-button";
@@ -11,10 +12,12 @@ import { WaButton } from "./wa-button";
 /**
  * Header + navigasi utama.
  *
- * CATATAN TAUTAN: /pricing, /studi-kasus, /tentang, /kontak, dan /produk/* baru
- * dibuat pada sprint W2 (lihat sitemap di CLAUDE.md). Tautannya sengaja sudah
- * dipasang sesuai sitemap dan akan 404 sampai halaman tujuan ada — situs belum
- * di-deploy selama W1.
+ * CATATAN TAUTAN (W2-12): nav hanya menautkan rute yang sudah HIDUP. Penyaringnya
+ * `saringTautan()` dari content/rute.ts — daftar rute hidupnya ada di sana dan
+ * HANYA di sana, dipakai bersama footer dan seluruh halaman. Menghidupkan
+ * /studi-kasus (W2-03) atau /insight (W2-06) = menambah satu baris di berkas itu,
+ * bukan menyunting komponen ini. Data nav-nya sendiri tetap utuh di
+ * content/copy/umum.ts — jangan menghapus item dari copy.
  *
  * Label a11y di bawah bukan copy pemasaran (tidak tersedia di content/copy/umum.ts).
  * Bila content-writer menambahkannya ke content/, ganti konstanta ini dengan impor.
@@ -25,21 +28,14 @@ const A11Y = {
   tutupMenu: "Tutup menu navigasi",
 } as const;
 
-/**
- * "Insight" (/insight) DISEMBUNYIKAN sampai W2-06 karena halamannya belum ada.
- * Datanya tetap utuh di content/copy/umum.ts — cukup kosongkan array ini saat
- * W2-06 selesai, jangan menghapus item dari copy.
- */
-const HREF_DITUNDA: string[] = ["/insight"];
-
-const menuUtama = navUtama.filter((item) => !HREF_DITUNDA.includes(item.href));
+const menuUtama = saringTautan(navUtama);
 
 /** Item "Produk" di navUtama adalah pemicu dropdown navProduk, bukan tautan biasa. */
 const pemicuProduk = menuUtama.find((item) => item.href.startsWith("/produk/"));
 const menuLain = menuUtama.filter((item) => !item.href.startsWith("/produk/"));
 
 /** Nama produk diambil dari content/site.ts lewat slug; subLabel dari content/copy. */
-const tautanProduk = navProduk.flatMap((item) => {
+const tautanProduk = saringTautan(navProduk).flatMap((item) => {
   const data = produk.find((p) => p.slug === item.slug);
   return data
     ? [{ slug: item.slug, href: item.href, nama: data.nama, subLabel: item.subLabel }]
