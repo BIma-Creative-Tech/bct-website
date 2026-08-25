@@ -39,8 +39,10 @@ export const metadata: Metadata = {
     locale: "id_ID",
     url: "/",
     siteName: site.name,
-    // Berkas OG image belum ada. Menyusul di W3-01 (SEO & OG image) — jangan
-    // menambahkan `images` dengan path karangan sebelum asetnya benar-benar ada.
+    // `images` sengaja TIDAK disetel: gambarnya datang dari app/opengraph-image.tsx
+    // (konvensi berkas Next), dan Next hanya menyisipkannya bila key `images`
+    // tidak ada di sini. Alasan lengkap + rujukan baris kode Next ada di
+    // components/sections/metadata-halaman.ts.
   },
 };
 

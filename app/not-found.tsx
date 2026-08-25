@@ -65,6 +65,10 @@ export const metadata: Metadata = {
   // root layout hanya berlaku untuk <title>, tidak untuk og:title (pola yang sama
   // dipakai components/sections/metadata-produk.ts). `alternates.canonical`
   // sengaja tidak dipasang — halaman ini tidak punya URL kanonik.
+  //
+  // og:image-nya diwarisi dari app/opengraph-image.tsx karena berkas ini berada di
+  // segmen root, jadi kartu share-nya memuat judul beranda. Disengaja; alasannya
+  // di kepala app/opengraph-image.tsx.
   openGraph: {
     title: `${tidakDitemukan.meta.title} — ${site.name}`,
     description: tidakDitemukan.meta.description,

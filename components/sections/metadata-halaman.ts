@@ -18,8 +18,14 @@ import { site } from "@/content/site";
  * sini supaya og:title identik dengan <title> — diverifikasi pada HTML hasil build.
  * (ADR 2026-08-24 di docs/decisions.md.)
  *
- * `openGraph.images` sengaja dikosongkan: berkas OG belum ada (menyusul di W3-01),
- * dan menunjuk path yang belum ada lebih buruk daripada tidak punya gambar.
+ * `openGraph.images` HARUS TETAP TIDAK DISETEL DI SINI — bukan kelalaian, dan bukan
+ * berarti halaman tanpa gambar. Sejak W3-01 tiap segmen rute punya berkas
+ * `opengraph-image.tsx` sendiri (kartunya di components/og/kartu-og.tsx), dan Next
+ * baru menambahkan gambar berkas itu ke metadata bila segmen tersebut TIDAK punya
+ * key `openGraph.images`: lihat syarat `!source.openGraph.hasOwnProperty('images')`
+ * pada `mergeStaticMetadata` di node_modules/next/dist/lib/metadata/resolve-metadata.js:149.
+ * Menuliskan `images` di sini — termasuk `images: []` — mematikan og:image di
+ * SEMUA halaman yang memakai helper ini sekaligus.
  *
  * @param meta `meta` dari content/copy/<halaman>.ts
  * @param path path absolut halaman, mis. "/pricing" (dipakai canonical + og:url)
