@@ -11,10 +11,15 @@ import { BATAS_ISIAN } from "./batas";
  * - Tidak pernah menulis isi form (nama/kontak/pesan) atau URL webhook ke log.
  * - Respons error generik: tanpa stack, tanpa detail internal, tanpa header CORS.
  * - Situs tidak boleh bilang "terkirim" kalau tidak ada yang menerima.
+ * - Jebakan bot tidak boleh bisa dikenali dari LUAR — bukan hanya status/body/header,
+ *   tapi juga waktu respons (G-19).
  *
- * DUA HAL YANG SENGAJA BELUM DIKERJAKAN (menunggu keputusan owner):
- * 1. Penyimpanan rate limit bersama (KV/Redis) — butuh layanan + dependensi baru.
+ * TIGA HAL YANG SENGAJA BELUM DIKERJAKAN (menunggu keputusan owner):
+ * 1. Penyimpanan rate limit bersama (KV/Redis) — butuh layanan + dependensi baru (G-16).
  * 2. Pengerasan tujuan webhook (wajib https + header rahasia) — menyentuh data pribadi.
+ * 3. Captcha (Turnstile/hCaptcha) — G-20 bagian (b), dependensi + layanan pihak ketiga,
+ *    jadi gerbang konfirmasi owner. Yang dikerjakan di berkas ini hanya bagian (a):
+ *    Origin, content-type, dan ambang waktu isi form.
  */
 
 // ————————————————————————————————————————————————————————————————
@@ -29,6 +34,106 @@ const MAKS_BODY_BYTE = 16 * 1024;
 // Batas waktu ke webhook. Tanpa ini satu webhook lambat menahan permintaan
 // pengunjung sampai puluhan detik dan ikut menahan slot server.
 const BATAS_WAKTU_WEBHOOK_MS = 5_000;
+
+// ————————————————————————————————————————————————————————————————
+// Bentuk permintaan (G-20a) — Origin, content-type, ambang waktu isi form
+// ————————————————————————————————————————————————————————————————
+// Latar: security-auditor membuktikan skrip 22 baris mengirim 12 lead palsu dalam
+// 2,6 detik lewat halaman nyata, dan POST `text/plain` lintas origin dibalas 200.
+// Artinya penyerang bisa menanam pengirim di situs mana pun dan memakai IP ASLI
+// pengunjung situs itu — rate limit per-IP dilewati tanpa satu pun proxy.
+//
+// Tiga pagar di bawah menutup jalur itu TANPA dependensi baru. Semuanya sengaja
+// murah dan tidak menyentuh data pribadi. Yang mahal (captcha) = gerbang owner.
+//
+// PRINSIP YANG MENGIKAT KETIGANYA: menolak satu pengunjung sah lebih mahal
+// daripada meloloskan satu spam. Setiap pagar di bawah dipilih pada sisi longgar
+// bila ada keraguan, dan alasannya ditulis di tempat.
+
+/**
+ * Ambang waktu minimum antara halaman /kontak terbuka dan kiriman berangkat.
+ *
+ * Angkanya (3 detik) dipilih dari dua arah:
+ * - Batas bawah manusia: form ini mewajibkan nama (≥2), kontak (≥5), dan cerita
+ *   (≥10 karakter). Memuat halaman, mengisi tiga kontrol, lalu menekan kirim di
+ *   bawah 3 detik tidak mungkin diketik; bahkan menempel tiga kali pun lebih lama.
+ * - Batas atas serangan: skrip auditor menyelesaikan 12 kiriman dalam 2,6 detik
+ *   (±215 ms per kiriman). 3 detik membuat pola itu mustahil apa adanya.
+ * Sengaja TIDAK dinaikkan ke 8–15 detik: bot cukup menunggu, sementara setiap
+ * detik tambahan menambah peluang menolak manusia yang menempel isian dengan
+ * cepat — dan itu kerugian yang tidak bisa ditebus.
+ *
+ * Nilainya dilaporkan klien (`sejakDibuka`, diukur `performance.now()` di browser),
+ * jadi BISA dipalsukan oleh siapa pun yang membaca bundel JS. Itu memang batasnya:
+ * pagar ini menaikkan biaya otomasi naif, bukan membuktikan kemanusiaan. Yang
+ * membuktikan = captcha (G-20b, gerbang owner).
+ */
+const AMBANG_ISI_MS = 3_000;
+
+/** Satu-satunya content-type yang diterima. */
+const TIPE_ISI_WAJIB = "application/json";
+
+/**
+ * Kumpulan host yang dianggap "situs ini".
+ *
+ * `host` (dan `x-forwarded-host` di belakang proxy) memang bisa ditulis klien —
+ * tapi tidak oleh peramban yang sedang menyerang atas nama pengunjung: pada
+ * permintaan lintas origin peramban mengisi sendiri `Host` (tujuan sebenarnya) dan
+ * `Origin` (asal sebenarnya), dan keduanya termasuk header terlarang untuk skrip.
+ * Klien non-peramban (curl) memang bisa mengarang keduanya sekaligus — dan
+ * memang bukan itu yang ditutup pagar ini (lihat `asalAsing`).
+ */
+function hostSitusIni(req: NextRequest): Set<string> {
+  const daftar = [
+    req.headers.get("host"),
+    hopTerdekat(req.headers.get("x-forwarded-host")),
+    req.nextUrl.host,
+  ];
+  const hasil = new Set<string>();
+  for (const nilai of daftar) {
+    const host = nilai?.trim().toLowerCase();
+    if (host) hasil.add(host);
+  }
+  return hasil;
+}
+
+/**
+ * "Permintaan ini datang dari halaman milik orang lain."
+ *
+ * KEPUTUSAN DESAIN — `Origin` ABSEN DITERIMA, BUKAN DITOLAK:
+ * - Peramban WAJIB mengirim `Origin` pada setiap permintaan lintas origin, dan
+ *   pada POST bahkan ketika satu origin. Serangan yang jadi alasan pagar ini
+ *   (skrip di situs lain memakai peramban + IP pengunjung) karena itu SELALU
+ *   membawa `Origin` asing, dan skrip tidak bisa menghapus atau memalsukannya —
+ *   `Origin` adalah forbidden header name.
+ * - Sebaliknya, `Origin` bisa hilang pada permintaan yang SAH: sebagian ekstensi
+ *   privasi dan proxy korporat memangkas header, dan peramban lama tidak selalu
+ *   mengirimnya pada POST satu origin.
+ * - Jadi menolak yang absen tidak menutup satu pun jalur serangan berbasis
+ *   peramban, tapi berpotensi mematikan form untuk pengunjung sungguhan. Yang
+ *   tersisa (curl/skrip server tanpa `Origin`) memakai IP penyerang sendiri dan
+ *   sudah berhadapan dengan rate limit + ambang waktu di atas.
+ * - `Origin: null` DITOLAK. Nilai itu berarti origin opaque — iframe ber-sandbox,
+ *   `data:`/`blob:`, atau redirect lintas origin — dan itu persis cara termudah
+ *   menyembunyikan asal serangan (`<iframe sandbox>` + fetch). Pengunjung sungguhan
+ *   di /kontak tidak pernah berada dalam konteks opaque, karena halamannya dilarang
+ *   di-iframe sama sekali (`frame-ancestors 'none'` + `X-Frame-Options: DENY` di
+ *   next.config.ts).
+ */
+function asalAsing(req: NextRequest): boolean {
+  const asal = req.headers.get("origin");
+  if (asal === null) return false; // absen → diterima; alasan di atas
+  if (asal === "null") return true; // origin opaque → tolak
+
+  let host: string;
+  try {
+    host = new URL(asal).host.toLowerCase();
+  } catch {
+    return true; // bukan URL sah: hanya klien yang mengarang header yang begini
+  }
+  if (!host) return true;
+  return !hostSitusIni(req).has(host);
+}
 
 // ————————————————————————————————————————————————————————————————
 // Rate limit — dan batas perlindungannya (dibaca apa adanya, bukan jaminan)
@@ -252,14 +357,117 @@ const LeadSchema = z.object({
   // Honeypot "website". SENGAJA menerima nilai apa pun: skema yang menolak
   // isian bot (dulu `z.literal("")`) membalas 422 dan langsung memberitahu bot
   // field mana jebakannya — sekali coba, jebakan hangus. Nilainya diperiksa
-  // setelah validasi, di titik yang balasannya sama persis dengan kiriman sah.
+  // setelah validasi, di titik yang balasannya sama persis dengan kiriman sah
+  // (termasuk pada sumbu waktu — lihat `jedaSeolahDiteruskan`).
+  // Nama field di kabel tetap "website" dan tidak boleh diubah tanpa mengubah
+  // form; yang diganti pada G-19b adalah nama KUNCI COPY di sisi klien, karena
+  // kunci itulah yang ikut terbit ke HTML lewat muatan RSC.
   website: z.unknown().optional(),
+  // Berapa lama halaman /kontak sudah terbuka saat kiriman berangkat, dalam ms
+  // (`performance.now()` di browser). Dipakai ambang `AMBANG_ISI_MS`; nilainya
+  // laporan klien, jadi tidak dipercaya sebagai bukti — hanya sebagai pagar.
+  // Dibatasi 30 hari supaya angka konyol tidak ikut lolos ke logika di bawah.
+  sejakDibuka: z
+    .number()
+    .int()
+    .min(0)
+    .max(30 * 24 * 60 * 60 * 1_000)
+    .optional(),
 });
 
 function honeypotTerisi(nilai: unknown): boolean {
   if (nilai === undefined || nilai === null) return false;
   if (typeof nilai === "string") return nilai.trim() !== "";
   return true; // tipe apa pun selain string kosong: bukan pengunjung normal
+}
+
+// ————————————————————————————————————————————————————————————————
+// Menutup oracle waktu pada jebakan (G-19a)
+// ————————————————————————————————————————————————————————————————
+// Cabang jebakan membalas 200 dengan body dan header yang identik dengan kiriman
+// sukses — tapi ia `return` tanpa pernah memanggil webhook, sehingga SELALU jauh
+// lebih cepat. Terukur security-auditor dengan webhook berlatensi 200 ms:
+// terperangkap median 3,7 ms vs sah median 215,9 ms. Dua kelompok yang terpisah
+// sempurna: satu pasang request cukup untuk menemukan nama field jebakan, dan
+// sesudah itu jebakannya hangus selamanya.
+//
+// Perbaikannya: cabang jebakan menunggu selama perkiraan waktu yang DIHABISKAN
+// KIRIMAN SAH di webhook. Perkiraannya tidak ditebak konstan, melainkan diambil
+// dari pengukuran nyata — durasi setiap panggilan webhook (sukses, non-2xx,
+// maupun timeout) disimpan di cincin kecil di bawah, lalu satu contoh diambil
+// acak dan digoyang ±10%. Karena contohnya berasal dari distribusi yang sama,
+// sebaran kedua kelompok saling tumpang tindih, bukan sekadar bergeser.
+//
+// BATAS YANG PERLU DIKETAHUI:
+// 1. Sebelum ada satu pun kiriman sah di instans ini, cincinnya masih berisi
+//    tebakan awal. Kalau webhook sebenarnya jauh lebih lambat dari tebakan itu,
+//    permintaan jebakan PERTAMA di instans yang baru dingin masih bisa terbaca
+//    lebih cepat. Satu kiriman sah sudah cukup untuk mengoreksinya.
+// 2. Cincin ini per instans, sama seperti rate limit (lihat G-16).
+// 3. Jedanya memang menahan slot server selama ±satu RTT webhook. Itu memang
+//    harganya: biaya permintaan jebakan dibuat sama dengan biaya kiriman sah.
+// 4. Sumbu waktu bukan satu-satunya yang tersisa saat webhook SEDANG RUSAK:
+//    kiriman sah dibalas 502 sementara jebakan tetap 200, jadi selama gangguan
+//    jebakannya bisa dikenali dari status. Itu tidak diperbaiki di sini dengan
+//    sengaja — menyembunyikannya berarti membalas "terkirim" untuk lead yang
+//    tidak sampai, dan itu dilarang (ADR 2026-08-25).
+const CONTOH_DURASI_MAKS = 16;
+/** Tebakan awal RTT webhook, hanya dipakai sampai ada pengukuran nyata. */
+const DURASI_WEBHOOK_AWAL_MS = 220;
+const contohDurasiWebhook = new Array<number>(CONTOH_DURASI_MAKS).fill(DURASI_WEBHOOK_AWAL_MS);
+let posisiContoh = 0;
+
+function catatDurasiWebhook(ms: number): void {
+  if (!Number.isFinite(ms)) return;
+  contohDurasiWebhook[posisiContoh] = Math.min(Math.max(ms, 0), BATAS_WAKTU_WEBHOOK_MS);
+  posisiContoh = (posisiContoh + 1) % CONTOH_DURASI_MAKS;
+}
+
+/**
+ * Pecahan acak [0,1) dari CSPRNG, bukan `Math.random()`.
+ *
+ * Bukan paranoia berlebihan: seluruh gunanya angka ini adalah menyamarkan waktu,
+ * dan `Math.random()` adalah PRNG yang keadaannya bisa disimpulkan dari cukup
+ * banyak keluaran. Di sini keluarannya justru terbaca penyerang dalam bentuk
+ * durasi respons. `crypto` global tersedia di runtime Node maupun Edge.
+ */
+function acak(): number {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return (buf[0] ?? 0) / 2 ** 32;
+}
+
+/**
+ * Selisih rata-rata antara lama `setTimeout` yang DIMINTA dan yang benar-benar
+ * terjadi, dalam ms. Nol pada mesin dengan timer halus; di Windows granularitas
+ * timernya kasar (±15 ms) dan tanpa koreksi ini cabang jebakan jadi konsisten
+ * LEBIH LAMBAT daripada kiriman sah — sama bocornya dengan konsisten lebih cepat,
+ * hanya berpindah tanda. Nilainya dikalibrasi sendiri dari jeda-jeda sebelumnya,
+ * jadi tidak ada angka khas satu sistem operasi yang dibakar di kode.
+ */
+let koreksiTidurMs = 0;
+
+function tidur(ms: number): Promise<void> {
+  const target = Math.max(0, ms - koreksiTidurMs);
+  const mulai = performance.now();
+  return new Promise<void>((selesai) => setTimeout(selesai, target)).then(() => {
+    const lebih = performance.now() - mulai - target;
+    // Rata-rata bergerak; dijaga di rentang wajar supaya satu event loop yang
+    // tersendat tidak mengacaukan seluruh kalibrasi.
+    koreksiTidurMs = Math.min(80, Math.max(0, koreksiTidurMs * 0.7 + lebih * 0.3));
+  });
+}
+
+function jedaSeolahDiteruskan(): Promise<void> {
+  const dasar =
+    contohDurasiWebhook[Math.floor(acak() * CONTOH_DURASI_MAKS)] ?? DURASI_WEBHOOK_AWAL_MS;
+  // Jitter kecil (±3%) DI ATAS contoh nyata. Sebarannya sudah datang dari
+  // pengukuran sungguhan; jitter hanya mencegah satu nilai diputar ulang persis.
+  // Sengaja tidak lebih lebar: jeda yang sebarannya jauh lebih gemuk daripada
+  // kiriman sah juga bisa dibedakan, hanya butuh lebih banyak sampel.
+  const jitter = 0.97 + acak() * 0.06;
+  const ms = Math.min(BATAS_WAKTU_WEBHOOK_MS, Math.max(0, dasar * jitter));
+  return tidur(ms);
 }
 
 // ————————————————————————————————————————————————————————————————
@@ -322,6 +530,28 @@ function balas(
 const PESAN_GAGAL = "Gagal mengirim. Silakan hubungi kami lewat WhatsApp.";
 
 export async function POST(req: NextRequest) {
+  // Dua pagar bentuk permintaan didahulukan: keduanya hanya membaca header, tidak
+  // menyentuh Map rate limit maupun body, dan menolak di sini berarti kiriman
+  // lintas situs tidak ikut menghabiskan jatah IP pengunjung yang dipinjam.
+  if (asalAsing(req)) {
+    return balas({ error: PESAN_GAGAL }, 403);
+  }
+
+  // Wajib `application/json`. Ini yang memaksa peramban melakukan preflight untuk
+  // setiap POST lintas origin: tiga tipe "sederhana" (text/plain,
+  // x-www-form-urlencoded, multipart/form-data) berhenti di sini, dan preflight
+  // tidak pernah dijawab karena endpoint ini memang tidak punya handler OPTIONS
+  // dan tidak mengirim satu pun header CORS.
+  //
+  // Efek samping yang disengaja: pengiriman <form> bawaan peramban (yang selalu
+  // mengirim salah satu tipe sederhana) juga berhenti di sini — lihat `action`
+  // pada components/sections/form-kontak.tsx, yang memakai jalur ini sebagai
+  // penampung aman supaya isian tidak pernah mendarat di query string.
+  const tipeIsi = (req.headers.get("content-type") ?? "").split(";")[0]?.trim().toLowerCase();
+  if (tipeIsi !== TIPE_ISI_WAJIB) {
+    return balas({ error: "Format tidak valid." }, 415);
+  }
+
   const kuota = konsumsiKuota(identitasKlien(req));
   if (!kuota.boleh) {
     return balas({ error: "Terlalu banyak percobaan. Coba lagi sebentar lagi." }, 429, {
@@ -348,6 +578,16 @@ export async function POST(req: NextRequest) {
     return balas({ error: "Data tidak lengkap atau tidak valid." }, 422);
   }
 
+  // Terlalu cepat untuk diisi manusia (atau tidak melaporkan waktu sama sekali).
+  // Balasannya disamakan dengan Origin asing — satu pintu "ditolak" saja, supaya
+  // tidak ada status khusus yang memberi tahu bot bahwa yang salah hanya waktunya.
+  // Pengunjung sungguhan yang entah bagaimana tertimpa ini melihat pesan `gagal`
+  // ("coba kirim lagi") dan percobaan berikutnya pasti lolos, karena halamannya
+  // sudah lebih lama terbuka.
+  if ((parsed.data.sejakDibuka ?? 0) < AMBANG_ISI_MS) {
+    return balas({ error: PESAN_GAGAL }, 403);
+  }
+
   const webhook = process.env.LEAD_WEBHOOK_URL;
   if (!webhook) {
     // Tanpa tujuan, lead hilang senyap. Jangan pernah membalas {ok:true} di sini —
@@ -360,10 +600,13 @@ export async function POST(req: NextRequest) {
 
   if (honeypotTerisi(parsed.data.website)) {
     // Terperangkap: balas persis seperti kiriman sukses, tapi TIDAK meneruskan
-    // apa pun ke webhook.
+    // apa pun ke webhook. Jedanya menyamakan sumbu terakhir yang masih membocorkan
+    // jebakan ini — waktu (G-19a, lihat blok penjelasan di atas).
+    await jedaSeolahDiteruskan();
     return balas({ ok: true }, 200);
   }
 
+  const mulaiWebhook = performance.now();
   try {
     const res = await fetch(webhook, {
       method: "POST",
@@ -381,6 +624,10 @@ export async function POST(req: NextRequest) {
 
     // Balasan webhook tidak dipakai — lepaskan koneksinya, jangan digantung.
     await res.body?.cancel().catch(() => undefined);
+    // Dicatat SETELAH koneksi dilepas supaya yang terukur adalah seluruh waktu
+    // yang dihabiskan kiriman sah di cabang ini — itu yang harus ditiru jeda
+    // jebakan. Dicatat untuk 2xx maupun non-2xx: keduanya sama-sama menunggu.
+    catatDurasiWebhook(performance.now() - mulaiWebhook);
 
     if (!res.ok) {
       // Hanya status; JANGAN pernah mencatat isi form atau URL webhook (URL bisa
@@ -389,6 +636,7 @@ export async function POST(req: NextRequest) {
       return balas({ error: PESAN_GAGAL }, 502);
     }
   } catch {
+    catatDurasiWebhook(performance.now() - mulaiWebhook);
     console.error("[lead] webhook tidak terjangkau atau melewati batas waktu");
     return balas({ error: PESAN_GAGAL }, 502);
   }

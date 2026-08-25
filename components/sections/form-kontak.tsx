@@ -31,12 +31,31 @@ import type { FormKontakCopy } from "@/content/copy";
  *    menyuruh pengunjung menyalin pesannya ke WhatsApp, dan mengosongkan form
  *    akan menghapus tulisan yang baru saja ia susun.
  * 4. Honeypot `website` tidak pernah divalidasi dan tidak pernah diberi pesan —
- *    mengeluhkan isinya sama dengan memberitahu bot mana jebakannya.
- * 5. Tombol submit MATI sampai komponen ini terhidrasi (state `siap`). Form ini
- *    tidak punya `action`/`method`, jadi selama `onSubmit` belum terpasang, klik
- *    atau Enter memicu pengiriman BAWAAN browser: GET ke URL halaman ini dengan
- *    seluruh isian menempel di query string. Alasan lengkapnya di `siap`.
- * 6. Akibat aturan 5, dengan JavaScript dimatikan penuh tombol itu mati selamanya
+ *    mengeluhkan isinya sama dengan memberitahu bot mana jebakannya. Kunci copy-nya
+ *    bernama `situs`, BUKAN `honeypot`; alasannya aturan 9.
+ * 5. TIGA LAPIS supaya isian tidak pernah mendarat di query string. Seluruh
+ *    pengiriman yang sah lewat `kirim()` yang memanggil `preventDefault()`; yang
+ *    di bawah ini menjaga semua jalur lain:
+ *    a. `disabled` pada tombol submit sampai komponen terhidrasi (state `siap`) —
+ *       menutup klik DAN Enter di isian teks (pengiriman implisit dibatalkan bila
+ *       tombol default form nonaktif). Alasan lengkapnya di `siap`.
+ *    b. Listener `submit` fase capture yang `preventDefault()` selama `!siap` atau
+ *       selama kiriman lain masih berjalan — menutup `form.requestSubmit()`, yang
+ *       MELEWATI `disabled` sepenuhnya. Hanya berlaku setelah JavaScript berkas ini
+ *       hidup; sebelum itu tidak ada listener apa pun yang bisa dipasang.
+ *    c. `method="post" action="/api/lead"` sebagai penampung terakhir untuk apa pun
+ *       yang lolos dari (a) dan (b) — termasuk `form.submit()`, yang menurut
+ *       spesifikasi TIDAK memicu event `submit` sama sekali sehingga MUSTAHIL
+ *       dicegat listener mana pun (capture maupun bubble). Tanpa `action`, jalur itu
+ *       menjadi GET ke halaman ini dengan nama, kontak, dan seluruh isi pesan
+ *       menempel di query string — masuk riwayat peramban, log CDN, dan tautan yang
+ *       bisa dibagikan. Dengan `action`, isian berpindah ke body POST (tidak pernah
+ *       ke URL) dan endpoint membalas 415 karena pengiriman <form> bawaan tidak
+ *       pernah mengirim `application/json` (lihat `TIPE_ISI_WAJIB` di
+ *       app/api/lead/route.ts). Jadi: nol isian di URL, nol lead palsu di webhook.
+ *       Lapis ini TIDAK pernah tersentuh pengunjung biasa — hanya skrip di halaman
+ *       (XSS/ekstensi/devtools) yang bisa memanggil `submit()`/`requestSubmit()`.
+ * 6. Akibat aturan 5a, dengan JavaScript dimatikan penuh tombol itu mati selamanya
  *    sambil terlihat normal. `copy.tanpaJs` di dalam `<noscript>` tepat di atasnya
  *    yang menjelaskannya — dan HANYA di dalam `<noscript>`, tidak pernah lewat
  *    `!siap`.
@@ -69,6 +88,42 @@ import type { FormKontakCopy } from "@/content/copy";
  *    app/api/lead/route.ts (422 → `gagalValidasi`). `minLength` tetap dipasang —
  *    ia tidak memotong apa pun, dan dengan `noValidate` ia hanya menandai kontrol
  *    sebagai `:invalid` tanpa memunculkan pesan bawaan browser.
+ * 9. NAMA KUNCI `copy` IKUT TERBIT KE HTML. Seluruh objek `copy` dioper dari server
+ *    component ke berkas ini, dan React menyerialkan prop client component ke muatan
+ *    RSC yang menempel di HTML halaman. Jadi bukan hanya kalimatnya yang terbaca
+ *    siapa pun — nama kuncinya juga. Dulu kunci jebakan bernama `honeypot`, sehingga
+ *    HTML `/kontak` memuat `"honeypot":{"label":"Website"}` dan bot cukup mencari
+ *    string itu lalu membiarkan `name="website"` kosong (G-19b). Sekarang kuncinya
+ *    `situs` — netral, tidak membedakan diri dari kunci isian lain. JANGAN
+ *    mengembalikannya ke nama yang menyebut fungsinya, dan berlaku sama untuk kunci
+ *    baru mana pun yang menyentuh anti-bot.
+ * 10. `sejakDibuka` dikirim bersama isian: berapa milidetik halaman sudah terbuka
+ *    saat kirim ditekan (`performance.now()`, jam monoton yang tidak terpengaruh
+ *    perubahan jam sistem). Server menolak kiriman yang lebih cepat dari ambangnya
+ *    (`AMBANG_ISI_MS` di app/api/lead/route.ts). Angkanya sengaja TIDAK diduplikasi
+ *    di sini: berkas ini hanya melapor, tidak ikut memutuskan — kalau form ikut
+ *    menahan kiriman, dua salinan ambang bisa melenceng dan pengunjung ditolak diam-
+ *    diam di sisi yang tidak punya pesan galat.
+ * 11. Penyembunyian jebakan diduplikasi ke atribut `style` inline, bukan hanya kelas
+ *    Tailwind. Kalau stylesheet gagal dimuat, isian berlabel "Website" muncul
+ *    sebagai isian sungguhan (terukur auditor: tinggi 21 px), dan pengunjung yang
+ *    mengisinya dapat balasan "Pesan Anda terkirim" padahal leadnya dibuang di
+ *    server. Inline style ikut berlaku tanpa satu berkas CSS pun (G-21c).
+ *
+ * SATU RISIKO YANG SENGAJA DITERIMA, BUKAN TERLUPAKAN (G-21b):
+ * pengunjung dengan JavaScript AKTIF tapi chunk berkas ini gagal dimuat permanen
+ * (mis. 404 setelah deploy) melihat tombol mati tanpa penjelasan — `<noscript>`
+ * menurut definisi tidak menjangkau mereka. Usulnya: tampilkan pesan lewat timer
+ * bila hidrasi tak terjadi dalam ±10 detik. Itu TIDAK dikerjakan karena timernya
+ * harus hidup di dalam chunk yang justru sedang gagal dimuat — satu-satunya
+ * kondisi yang ingin dilaporkannya. Dua jalan keluar yang benar-benar bekerja
+ * keduanya di luar berkas ini dan butuh keputusan lain: (1) skrip inline di
+ * server component, dan (2) pengungkap berbasis keyframe CSS di app/globals.css
+ * (yang juga harus menghormati prefers-reduced-motion). Keduanya juga menuntut
+ * KALIMAT BARU dari content-writer: `copy.tanpaJs` berbunyi "JavaScript sedang
+ * tidak aktif", dan itu keterangan yang KELIRU untuk orang yang JavaScript-nya
+ * hidup. Sementara itu kerugiannya tertahan: seluruh CTA WhatsApp di halaman ini
+ * adalah tautan biasa yang tetap berfungsi tanpa satu baris JavaScript.
  */
 
 /** Batas satu isian teks. Bentuknya sama dengan tiap entri `BATAS_ISIAN`. */
@@ -143,6 +198,45 @@ const dariKlien = () => true;
 const dariServer = () => false;
 
 /**
+ * Waktu modul ini mulai dijalankan peramban — cadangan untuk `msSejakDibuka()`.
+ * Di server nilainya ikut terhitung tapi tidak pernah dipakai: fungsinya hanya
+ * dipanggil dari `kirim()`, yang cuma berjalan setelah ada interaksi di browser.
+ */
+const modulDimuat = Date.now();
+
+/**
+ * Berapa milidetik halaman ini sudah terbuka (aturan 10 di kepala berkas).
+ *
+ * `performance.now()` dihitung dari time origin = awal navigasi, jadi angkanya
+ * sudah mencakup waktu muat halaman tanpa perlu menyimpan penanda sendiri, dan
+ * jamnya monoton (kebal terhadap koreksi jam sistem/NTP di tengah pengisian).
+ * Cadangannya `Date.now()` sejak modul dimuat, untuk peramban tanpa `performance`.
+ */
+function msSejakDibuka(): number {
+  const sejakNavigasi = typeof performance !== "undefined" ? performance.now() : Number.NaN;
+  const ms = Number.isFinite(sejakNavigasi) ? sejakNavigasi : Date.now() - modulDimuat;
+  return Math.max(0, Math.round(ms));
+}
+
+/**
+ * Penyembunyian jebakan yang tidak bergantung stylesheet (aturan 11 di kepala
+ * berkas). Isinya SAMA PERSIS dengan kelas Tailwind pada elemen yang sama, jadi
+ * tidak ada perilaku baru saat CSS normal — hanya kembaran yang tetap berlaku
+ * ketika berkas CSS gagal dimuat.
+ *
+ * Tetap digeser ke luar layar, BUKAN `display:none`: bot yang membaca computed
+ * style melewati elemen yang disembunyikan, dan jebakan yang dilewati tidak
+ * menangkap apa pun.
+ */
+const gayaJebakan = {
+  position: "absolute",
+  left: "-9999px",
+  height: 0,
+  width: 0,
+  overflow: "hidden",
+} as const;
+
+/**
  * `tombolWa` = tombol WhatsApp yang SUDAH DIRENDER DI SERVER oleh <HalamanKontak>
  * (<WaButton> dengan label dan pesan prefill dari `kontak.penutup.primer`). Dioper
  * sebagai elemen, bukan dirakit di sini — alasannya aturan 7 di kepala berkas.
@@ -204,6 +298,7 @@ export function FormKontak({ copy, tombolWa }: { copy: FormKontakCopy; tombolWa:
   const [rondeHasil, setRondeHasil] = useState(0);
   const ringkasanRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   /**
    * Pagar klik ganda yang sebenarnya. `disabled` pada tombol dan state `mengirim`
    * baru berlaku setelah React merender ulang, sedangkan beberapa klik yang jatuh
@@ -212,6 +307,35 @@ export function FormKontak({ copy, tombolWa }: { copy: FormKontakCopy; tombolWa:
    * klik. Ref berubah seketika, jadi klik kedua dan ketiga berhenti di sini.
    */
   const sedangKirim = useRef(false);
+
+  /**
+   * Lapis 5b: penjaga `submit` fase capture.
+   *
+   * `form.requestSubmit()` MELEWATI `disabled` pada tombol — spesifikasi hanya
+   * menyuruh peramban membatalkan pengiriman IMPLISIT (Enter) ketika tombol
+   * default nonaktif, bukan pengiriman yang diminta skrip. Tanpa penjaga ini,
+   * satu baris di konsol/ekstensi/XSS memicu pengiriman bawaan dan seluruh isian
+   * ikut ke query string.
+   *
+   * Fase capture, bukan bubble: ia berjalan sebelum handler React (`onSubmit`
+   * dikirim React dari akar pohon saat event menggelembung), jadi
+   * `preventDefault()`-nya pasti keburu. Propagasi TIDAK dihentikan — `kirim()`
+   * tetap dipanggil dan tetap menolak sendiri lewat pagar `sedangKirim`.
+   *
+   * Dipasang ulang setiap kali `siap` berubah karena penutupnya membaca nilai itu.
+   * Yang tidak bisa dijangkau dari sini: jendela SEBELUM chunk ini hidup (tidak
+   * ada JavaScript yang bisa memasang listener) dan `form.submit()` (tidak memicu
+   * event `submit` sama sekali). Keduanya ditangani lapis 5c — `action` POST.
+   */
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const tahan = (peristiwa: Event) => {
+      if (!siap || sedangKirim.current) peristiwa.preventDefault();
+    };
+    form.addEventListener("submit", tahan, true);
+    return () => form.removeEventListener("submit", tahan, true);
+  }, [siap]);
 
   useEffect(() => {
     if (rondeGalat > 0) ringkasanRef.current?.focus();
@@ -251,7 +375,10 @@ export function FormKontak({ copy, tombolWa }: { copy: FormKontakCopy; tombolWa:
       const res = await fetch("/api/lead", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ nama, kontak, produk, pesan, website }),
+        // `sejakDibuka` = aturan 10 di kepala berkas. Diukur di sini, bukan saat
+        // isian pertama diketik: yang ingin dibedakan server adalah "halaman baru
+        // dibuka lalu langsung dikirim", bukan lama-tidaknya mengetik.
+        body: JSON.stringify({ nama, kontak, produk, pesan, website, sejakDibuka: msSejakDibuka() }),
       });
 
       // Pemetaan status → copy: tabel di content/copy/kontak.ts. Jangan
@@ -297,7 +424,25 @@ export function FormKontak({ copy, tombolWa }: { copy: FormKontakCopy; tombolWa:
   const idRingkasan = `${id}-ringkasan`;
 
   return (
-    <form noValidate onSubmit={kirim} className="mt-10 max-w-2xl">
+    /* `method`/`action` = lapis 5c di kepala berkas: penampung terakhir, BUKAN jalur
+       pengiriman yang sebenarnya. Setiap kiriman sah berhenti di `onSubmit` →
+       `kirim()` → `preventDefault()`, jadi atribut ini tidak pernah dipakai pada
+       pemakaian normal. Ia hanya menentukan KE MANA pengiriman bawaan pergi kalau
+       ada yang berhasil memicunya (paling nyata: `form.submit()` dari skrip, yang
+       tidak memicu event `submit` sehingga tak satu pun listener bisa mencegahnya).
+       Dengan POST, isian berpindah ke body — bukan ke query string. Endpoint-nya
+       membalas 415 karena <form> bawaan tidak pernah mengirim `application/json`,
+       jadi tidak ada lead palsu yang lolos lewat jalur ini.
+       JANGAN diganti menjadi GET atau ditujukan ke halaman ini sendiri: itu persis
+       kebocoran yang ditutup blocker [TINGGI] audit W2-07. */
+    <form
+      ref={formRef}
+      noValidate
+      method="post"
+      action="/api/lead"
+      onSubmit={kirim}
+      className="mt-10 max-w-2xl"
+    >
       {Object.values(galat).some(Boolean) ? (
         <div
           ref={ringkasanRef}
@@ -409,20 +554,31 @@ export function FormKontak({ copy, tombolWa }: { copy: FormKontakCopy; tombolWa:
         />
       </Bidang>
 
-      {/* Honeypot. Wajib ADA di DOM lengkap dengan <label> (itu yang membuat bot
+      {/* Jebakan bot. Wajib ADA di DOM lengkap dengan <label> (itu yang membuat bot
           mengisinya), tapi wajib TIDAK terlihat, TIDAK terjangkau Tab, dan TIDAK
           dibacakan pembaca layar.
           - Digeser ke luar layar, bukan `display:none`: bot yang membaca computed
             style melewati elemen yang disembunyikan, dan jebakan yang dilewati
             tidak menangkap apa pun. Geseran ke KIRI tidak pernah menimbulkan
             gulir horizontal pada arah tulisan kiri-ke-kanan.
+          - Kelas Tailwind DAN `style` inline yang isinya sama persis. Bukan
+            duplikasi yang terlupa dibersihkan: kelas butuh stylesheet situs, dan
+            saat berkas CSS gagal dimuat isian ini pernah terukur setinggi 21 px —
+            terlihat, terisi pengunjung, lalu leadnya dibuang di server sambil
+            dibalas "Pesan Anda terkirim" (G-21c). Inline style tidak punya
+            ketergantungan itu. Ubah salah satu = ubah keduanya.
           - `aria-hidden` menutupinya dari pembaca layar, `tabIndex={-1}`
             mengeluarkannya dari urutan Tab (sekaligus syarat agar `aria-hidden`
             tidak membungkus elemen yang bisa difokus).
           Nilainya tidak pernah divalidasi di sini: keputusannya milik server, di
-          titik yang balasannya identik dengan kiriman sah (app/api/lead/route.ts). */}
-      <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
-        <label htmlFor={idWebsite}>{copy.honeypot.label}</label>
+          titik yang balasannya identik dengan kiriman sah — termasuk lamanya
+          (app/api/lead/route.ts, `jedaSeolahDiteruskan`). */}
+      <div
+        aria-hidden="true"
+        style={gayaJebakan}
+        className="absolute -left-[9999px] h-0 w-0 overflow-hidden"
+      >
+        <label htmlFor={idWebsite}>{copy.situs.label}</label>
         <input
           id={idWebsite}
           name="website"

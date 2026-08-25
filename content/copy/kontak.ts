@@ -13,9 +13,10 @@ import type { BlokCta, HeroCopy, KepalaSection, MetaCopy } from "./types";
  * - Nama field form di bawah SUDAH DISAMAKAN dengan skema zod di app/api/lead/route.ts:
  *   nama, kontak, pesan, produk ("bima-insight" | "odoo" | "web-apps" | "lainnya"),
  *   dan honeypot "website". Jangan mengganti nama field tanpa mengubah route-nya.
- * - Field honeypot wajib tersembunyi dari pengguna dan dari pembaca layar
- *   (mis. `aria-hidden` + `tabIndex={-1}` + tidak terlihat), tapi TETAP punya label
- *   untuk bot. Teks label ada di `form.honeypot`.
+ * - Field jebakan bot wajib tersembunyi dari pengguna dan dari pembaca layar
+ *   (mis. `aria-hidden` + `tabIndex={-1}` + tidak terlihat lewat kelas DAN `style`
+ *   inline), tapi TETAP punya label untuk bot. Teks label ada di `form.situs` —
+ *   nama kunci itu sengaja netral, alasannya di catatan pada tipenya.
  * - Hanya `produk` yang boleh dikosongkan. `nama`, `kontak`, dan `pesan` wajib.
  * - Pesan galat di browser ada di `form.validasiLokal` — pakai itu, jangan biarkan
  *   browser memunculkan pesan bawaannya (bahasanya ikut setelan perangkat).
@@ -73,7 +74,18 @@ export type FormKontakCopy = {
   kontak: { label: string; bantuan: string; placeholder: string };
   produk: { label: string; bantuan: string; opsi: OpsiProduk[] };
   pesan: { label: string; bantuan: string; placeholder: string };
-  honeypot: { label: string };
+  /**
+   * Label isian jebakan bot (field `website` di form dan di skema route).
+   *
+   * NAMA KUNCINYA WAJIB NETRAL, dan itu bukan soal gaya. Seluruh objek `form` ini
+   * dioper ke client component, dan React menyerialkan prop client component ke
+   * muatan RSC yang menempel di HTML halaman — nama kunci ikut terbaca siapa pun
+   * yang membuka "view source". Kunci ini dulu bernama `honeypot`, sehingga HTML
+   * `/kontak` memuat `"honeypot":{"label":"Website"}` dan bot cukup mencari string
+   * itu untuk tahu isian mana yang harus dibiarkan kosong (G-19b, security-auditor
+   * 2026-08-25). Jangan mengembalikan nama yang menyebut fungsinya.
+   */
+  situs: { label: string };
   /**
    * Penanda untuk isian yang boleh dilewati. HANYA `produk` yang opsional —
    * `.optional()` di skema route; nama, kontak, dan pesan tidak punya penanda
@@ -280,8 +292,10 @@ export const kontak: KontakCopy = {
       placeholder:
         "Contoh: kami distributor dengan tiga gudang. Stok sering selisih dan laporan penjualan baru siap seminggu setelah tutup bulan.",
     },
-    honeypot: {
-      // Field jebakan bot. Wajib disembunyikan dari pengguna dan pembaca layar.
+    situs: {
+      // Field jebakan bot. Wajib disembunyikan dari pengguna dan pembaca layar —
+      // lewat kelas DAN `style` inline, supaya tetap tersembunyi bila CSS gagal
+      // dimuat. Kunci `situs` sengaja netral: lihat catatan pada tipenya.
       label: "Website",
     },
     penandaOpsional: "opsional",
