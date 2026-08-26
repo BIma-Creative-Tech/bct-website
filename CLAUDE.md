@@ -44,7 +44,7 @@ Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token dide
 
 | Route | Halaman | Status |
 |---|---|---|
-| `/` | Beranda: proposisi + 3 produk + bukti + CTA WA | beranda utuh (W1-03) — status mutakhir di `docs/checklist.md` |
+| `/` | Beranda: proposisi + 3 produk + bukti + CTA WA | hidup (W1-03) — status mutakhir di `docs/checklist.md` |
 | `/produk/bima-insight` | Bima Insight | hidup (W2-01) |
 | `/produk/odoo` | Implementasi Odoo + Odoo Care | hidup (W2-01) |
 | `/produk/web-apps` | Paket web & custom apps | hidup (W2-01) |
@@ -54,10 +54,14 @@ Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token dide
 | `/insight` | Blog/artikel pendek (MDX) | belum (W2-06) |
 | `/kontak` | Form lead + WA | hidup (W2-05); form membalas 503 sampai `LEAD_WEBHOOK_URL` diisi (G-17) |
 
+**Rute hidup dibaca dari `content/rute.ts`** (`RUTE_HIDUP` + `ruteHidup()`/`saringTautan()`/`tautanHidup()`) — satu-satunya sumber; nav, footer, CTA, `app/not-found.tsx`, dan `app/sitemap.ts` semuanya memakainya, jadi menghidupkan `/studi-kasus` atau `/insight` cukup satu baris di berkas itu. Jangan membuat daftar rute kedua. Batas yang perlu diketahui: aturan ini belum dipaksakan mesin (G-23) — tautan literal ke rute mati masih lolos lint/tsc/build.
+
+**Aset SEO sudah ada (W3-01), jangan dibuat ulang:** `app/sitemap.ts` → `/sitemap.xml` (7 `<loc>` dari `RUTE_HIDUP`), `app/robots.ts` → `/robots.txt`, `app/icon.tsx` → favicon, dan tujuh `opengraph-image.tsx` (root + `/pricing` + `/tentang` + `/kontak` + 3 `/produk/*`) → kartu OG 1200×630 lewat `components/og/`. Fontnya di `assets/fonts/`, bukan `public/`. Semua URL absolut masih menunjuk `http://localhost:3000` sampai domain diisi di W3-04. `/favicon.ico` sendiri tetap 404 (Next melarang favicon dirender kode) — keputusan menunggu owner di W3-01.
+
 ## Backlog sprint (kerjakan berurutan)
 
 - **W1 — Struktur & copy:** finalisasi copywriting semua halaman di `content/`, layout + nav + footer, halaman beranda utuh.
-- **W2 — Semua halaman:** produk ×3, pricing, studi kasus, tentang, kontak (form → mailto/API route sederhana → email + link WA), insight (MDX list + detail).
+- **W2 — Semua halaman:** produk ×3, pricing, studi kasus, tentang, kontak (form → `/api/lead` → webhook + link WA; **bukan** `mailto:` — ADR 2026-08-24 melarang alamat email terbit ke HTML), insight (MDX list + detail).
 - **W3 — Poles & rilis:** SEO (metadata per halaman, sitemap.xml, robots, OG image), Umami, aksesibilitas, uji mobile, deploy Vercel + domain.
 
 **Definition of Done situs:** live di domain sendiri · semua halaman konten nyata · form & tombol WA teruji · Lighthouse mobile ≥ 90 semua kategori · rate card PDF bisa diunduh · analytics mencatat.

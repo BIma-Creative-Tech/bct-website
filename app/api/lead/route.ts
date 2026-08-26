@@ -552,8 +552,11 @@ const CONTOH_DURASI_MAKS = 8;
 const CONTOH_MINIMAL = 4;
 
 /**
- * SISA waktu kiriman sah yang BERHASIL, terbaru di indeks terakhir: diukur dari
- * titik tepat sebelum `fetch(webhook)` sampai titik tepat sebelum balasan disusun.
+ * Satu pengukuran: SISA waktu sebuah kiriman sah, plus seberapa sibuk instans ini
+ * ketika waktu itu diukur.
+ *
+ * `ms` diukur dari titik tepat sebelum `fetch(webhook)` sampai titik tepat sebelum
+ * balasan disusun.
  *
  * KENAPA POTONGAN ITU, bukan total waktu handler. Cabang jebakan menempel jeda ini
  * pada titik yang sama di alurnya sendiri, jadi bagian sebelum titik itu (routing
@@ -566,10 +569,34 @@ const CONTOH_MINIMAL = 4;
  * Merekam potongan setelah titik itu saja membuat yang diputar ulang hanya waktu
  * yang memang tidak bisa diketahui sendiri oleh cabang jebakan: RTT webhook.
  *
- * KOSONG / kurang dari CONTOH_MINIMAL = instans ini belum tahu cukup untuk meniru
- * waktu kiriman sah; jangan pernah mengarang isinya (alasan panjang di blok atas).
+ * `beban` = PUNCAK jumlah panggilan webhook yang berjalan berbarengan selama periode
+ * sibuk tempat pengukuran ini lahir (1 = instans sepi). Penanda ini yang menutup
+ * peracunan cincin: durasi kiriman sah tidak hanya ditentukan webhook, tapi juga oleh
+ * antrean di depannya. Terukur pada rig ini dengan sink yang menyerialkan 200 ms:
+ * 40 kiriman sah serentak → 24 sukses bermedian 2553 ms (yang terakhir 4,9 detik),
+ * sementara kiriman sah yang sama saat instans sepi 205–219 ms. Satu angka tanpa
+ * penanda tidak bisa dibedakan asalnya; dengan penanda, pengukuran dari masa sibuk
+ * tidak pernah diputar ulang saat instans sudah sepi (lihat `pilihContoh`).
  */
-const contohDurasiSah: number[] = [];
+type Contoh = { ms: number; beban: number };
+
+/** Pengukuran kiriman sah yang BERAKHIR 2xx. Terbaru di indeks terakhir. */
+const contohSukses: Contoh[] = [];
+
+/**
+ * Pengukuran kiriman sah yang BERAKHIR GAGAL (non-2xx, tak terjangkau, lewat batas
+ * waktu). Cincin TERPISAH, dan itu bukan kerapian belaka — mencampurnya ke cincin
+ * sukses adalah lubang yang sudah terukur: banjir-sampai-timeout mengisi cincin
+ * dengan 4999 ms, lalu jebakan dipisahkan lewat uji satu sisi ">250 ms".
+ *
+ * Cincin ini HANYA dibaca ketika cincin sukses belum bisa dipakai, dan jebakan yang
+ * menirunya ikut dibalas 502 — persis yang diterima kiriman sah pada keadaan itu.
+ * Gunanya satu: memberi angka NYATA untuk ditiru ketika kuota `MAKS_KALIBRASI_JEBAKAN`
+ * habis padahal webhook tidak pernah sukses sekali pun (lihat batas 5). Tanpa cincin
+ * ini, satu-satunya cara mengisi cincin sukses adalah meneruskan jebakan tanpa batas
+ * — terukur 25 dari 25 muatan jebakan mendarat di sink pada sink yang selalu 500.
+ */
+const contohGagal: Contoh[] = [];
 
 /**
  * Kiriman sah PERTAMA sebuah proses tidak pernah masuk cincin.
@@ -590,19 +617,53 @@ let pengukuranPertamaDibuang = false;
 /** Atap contoh: batas waktu webhook plus kelonggaran untuk sisa penanganan. */
 const ATAP_CONTOH_MS = BATAS_WAKTU_WEBHOOK_MS + 1_000;
 
-function catatDurasiSah(ms: number): void {
+/**
+ * Pelacak beban instans: berapa panggilan webhook yang sedang berjalan, dan berapa
+ * puncaknya selama periode sibuk yang sedang berlangsung. Puncaknya dinolkan lagi
+ * begitu tidak ada panggilan tersisa — jadi "sibuk" tidak pernah menempel selamanya.
+ */
+let panggilanBerjalan = 0;
+let puncakPanggilan = 0;
+
+function mulaiPanggilanWebhook(): void {
+  panggilanBerjalan += 1;
+  if (panggilanBerjalan > puncakPanggilan) puncakPanggilan = panggilanBerjalan;
+}
+
+function selesaiPanggilanWebhook(): void {
+  panggilanBerjalan = Math.max(0, panggilanBerjalan - 1);
+  if (panggilanBerjalan === 0) puncakPanggilan = 0;
+}
+
+/**
+ * Beban yang akan dihadapi kiriman sah SEANDAINYA ia tiba sekarang: dirinya sendiri
+ * ditambah yang sedang berjalan, tapi tidak pernah lebih rendah daripada puncak
+ * periode sibuk yang sedang berlangsung. Bagian `puncak` itu penting: di tengah
+ * banjir, jumlah yang sedang berjalan sudah menyusut sementara antrean sink belum
+ * — memakai `panggilanBerjalan` saja membuat jebakan meniru keadaan sepi padahal
+ * kiriman sah masih mengantre.
+ */
+function bebanSekarang(): number {
+  return Math.max(puncakPanggilan, panggilanBerjalan + 1);
+}
+
+/** Apakah panggilan webhook terakhir yang selesai berakhir 2xx. */
+let hasilTerakhirSukses = true;
+
+function catatDurasi(ms: number, sukses: boolean): void {
   if (!Number.isFinite(ms)) return;
+  hasilTerakhirSukses = sukses;
   if (!pengukuranPertamaDibuang) {
     pengukuranPertamaDibuang = true;
     return;
   }
-  contohDurasiSah.push(Math.min(Math.max(ms, 0), ATAP_CONTOH_MS));
-  if (contohDurasiSah.length > CONTOH_DURASI_MAKS) contohDurasiSah.shift();
+  const cincin = sukses ? contohSukses : contohGagal;
+  cincin.push({
+    ms: Math.min(Math.max(ms, 0), ATAP_CONTOH_MS),
+    beban: Math.max(1, puncakPanggilan),
+  });
+  if (cincin.length > CONTOH_DURASI_MAKS) cincin.shift();
   waktuContohTerbaru = performance.now();
-}
-
-function cincinTerkalibrasi(): boolean {
-  return contohDurasiSah.length >= CONTOH_MINIMAL;
 }
 
 /**
@@ -631,10 +692,75 @@ const MAKS_KALIBRASI_JEBAKAN = 10;
 let waktuContohTerbaru = Number.NEGATIVE_INFINITY;
 let jumlahKalibrasiJebakan = 0;
 
-function perluKalibrasi(): boolean {
-  if (!cincinTerkalibrasi()) return true;
-  if (jumlahKalibrasiJebakan >= MAKS_KALIBRASI_JEBAKAN) return false;
-  return performance.now() - waktuContohTerbaru >= JEDA_KALIBRASI_MS;
+/** Cincin mana yang layak ditiru sekarang, dan seberapa longgar pemilihannya. */
+type Sumber = { cincin: Contoh[]; sukses: boolean; longgar: boolean };
+
+/** Apakah cincin ini punya pengukuran dari beban yang tidak lebih berat dari sekarang. */
+function adaContohSepadan(cincin: Contoh[], beban: number): boolean {
+  for (const contoh of cincin) if (contoh.beban <= beban) return true;
+  return false;
+}
+
+/**
+ * Bukti apa yang boleh ditiru cabang jebakan sekarang — atau `null` yang berarti
+ * "instans ini tidak punya pengukuran yang mewakili keadaan sekarang", sehingga
+ * permintaan ini harus diteruskan lewat jalur kiriman sah (dan sekaligus mengukur).
+ *
+ * URUTAN PEMERIKSAAN ITU BAGIAN DARI PERBAIKANNYA, bukan gaya penulisan:
+ *
+ * 1. KUOTA DULU. Versi sebelumnya memeriksa `!cincinTerkalibrasi()` lebih dulu dan
+ *    baru sesudahnya kuota, jadi selama cincin belum pernah terisi kuotanya TIDAK
+ *    PERNAH DIBACA. Cincin hanya terisi pada 2xx, jadi sink yang selalu gagal =
+ *    cincin dingin permanen = penerusan tanpa batas. Terukur pada sink yang selalu
+ *    500: 25 dari 25 muatan jebakan (nama, kontak, pesan lengkap) mendarat di sink;
+ *    pada sink yang membalas 200 setelah 6 detik (route menyerah di 5 detik): 8 dari
+ *    8 mendarat dan sink benar-benar memprosesnya. Kuota di urutan pertama membuat
+ *    `MAKS_KALIBRASI_JEBAKAN` benar-benar jadi atap seumur proses seperti yang
+ *    dijanjikan blok "HARGA PILIHAN (3)" di atas.
+ * 2. CINCIN GAGAL DIPERHITUNGKAN. Kalau webhook tidak pernah sukses, satu-satunya
+ *    pengukuran nyata yang ada adalah durasi panggilan yang GAGAL — dan itu justru
+ *    yang tepat untuk ditiru, karena pada keadaan itu kiriman sah pun berakhir 502.
+ *    Meniru cincin gagal berarti jebakan ikut dibalas 502; tidak ada satu byte pun
+ *    tambahan yang dikirim ke sink owner untuk mendapatkannya.
+ * 3. BEBAN HARUS SEPADAN. Cincin boleh penuh, tapi kalau seluruh isinya diukur saat
+ *    instans sedang dibanjiri, tidak satu pun mewakili kiriman sah yang tiba saat
+ *    instans sepi. Ini lubang peracunan cincin, dan angkanya ada di batas 4.
+ * 4. CINCIN TIDAK BOLEH MEMBEKU (`JEDA_KALIBRASI_MS`, alasan di atas).
+ *
+ * Ketika kuota SUDAH habis, tiga pemeriksaan terakhir dilonggarkan, bukan dibatalkan:
+ * meneruskan lagi bukan pilihan (itu spam tanpa batas), jadi yang tersisa adalah
+ * memakai bukti seadanya — pengukuran dengan beban paling ringan yang dipunya.
+ * Itu tebakan terbaik yang masih berupa angka nyata, dan batasnya dicatat di batas 5.
+ */
+function sumberJeda(): Sumber | null {
+  const beban = bebanSekarang();
+  const urut: Array<[Contoh[], boolean]> = hasilTerakhirSukses
+    ? [
+        [contohSukses, true],
+        [contohGagal, false],
+      ]
+    : [
+        [contohGagal, false],
+        [contohSukses, true],
+      ];
+
+  if (jumlahKalibrasiJebakan < MAKS_KALIBRASI_JEBAKAN) {
+    if (performance.now() - waktuContohTerbaru >= JEDA_KALIBRASI_MS) return null;
+    for (const [cincin, sukses] of urut) {
+      if (cincin.length >= CONTOH_MINIMAL && adaContohSepadan(cincin, beban)) {
+        return { cincin, sukses, longgar: false };
+      }
+    }
+    return null;
+  }
+
+  for (const [cincin, sukses] of urut) {
+    if (cincin.length >= CONTOH_MINIMAL) return { cincin, sukses, longgar: true };
+  }
+  for (const [cincin, sukses] of urut) {
+    if (cincin.length > 0) return { cincin, sukses, longgar: true };
+  }
+  return null;
 }
 
 /**
@@ -650,7 +776,7 @@ let kalibrasiBerjalan: Promise<void> | null = null;
 let tandaiKalibrasiSelesai: (() => void) | null = null;
 
 function bukaKalibrasi(): void {
-  if (cincinTerkalibrasi() || kalibrasiBerjalan) return;
+  if (kalibrasiBerjalan || sumberJeda() !== null) return;
   kalibrasiBerjalan = new Promise<void>((selesai) => {
     tandaiKalibrasiSelesai = selesai;
   });
@@ -715,11 +841,30 @@ const KOREKSI_MAKS_MS = 5;
 const BATAS_GALAT_MS = 3;
 const PENGUATAN_KOREKSI = 0.3;
 
+/**
+ * Berapa jeda jebakan yang sedang berjalan berbarengan.
+ *
+ * Dipakai untuk satu hal: koreksi HANYA diintegralkan ketika jeda ini sendirian.
+ * Alasannya terukur — `koreksiTidurMs` global, dan galat tidur di bawah beban
+ * didominasi antrean event loop, bukan kekasaran tik. Penyerang memakai itu:
+ * 120 jebakan serentak menyeret koreksi ke atas, lalu jeda-jeda sesudahnya bangun
+ * terlalu cepat. Angkanya ada di blok `KOREKSI_MIN_MS`.
+ */
+let jedaBerjalan = 0;
+
 /** Tidur sampai `selesaiPada` (jam `performance.now()`), bukan selama sekian ms. */
 async function tidurSampai(selesaiPada: number): Promise<void> {
   const lama = selesaiPada - performance.now() - koreksiTidurMs;
   if (lama <= 0) return; // sudah lewat: jangan mencemari kalibrasi dengan galat semu
-  await new Promise<void>((selesai) => setTimeout(selesai, lama));
+  jedaBerjalan += 1;
+  try {
+    await new Promise<void>((selesai) => setTimeout(selesai, lama));
+  } finally {
+    jedaBerjalan -= 1;
+  }
+  // Di bawah beban, galat tidur mengukur antrean event loop — bukan yang mau
+  // dikoreksi di sini, dan itu justru kanal yang bisa didorong penyerang.
+  if (jedaBerjalan > 0) return;
 
   // Galat dipotong sebelum diintegralkan. Di mesin uji `setTimeout` meleset median
   // 1,2 ms tapi sesekali satu tik penuh (maks 15,8 ms); tanpa pemotongan, satu
@@ -775,47 +920,85 @@ const KECONDONGAN_BARU = 1.5;
  */
 
 /**
- * Berapa lama jeda jebakan harus berlangsung, dalam ms.
- * 0 berarti "pengukurannya belum cukup" — pemanggil WAJIB menanganinya, bukan
- * menidurkan 0 ms (itu persis oracle yang sedang ditutup).
+ * Ambil satu contoh dari cincin, condong ke yang paling baru (KECONDONGAN_BARU).
+ *
+ * Yang diambil hanya contoh dengan `beban` tidak lebih berat daripada beban saat ini.
+ * Di keadaan tenang semua contoh berbeban 1 dan `bebanSekarang()` juga 1, jadi
+ * saringan ini TIDAK mengubah apa pun — terukur AUC ABBA sebelum/sesudah saringan:
+ * @@AUC30@@ pada webhook 30 ms dan @@AUC900@@ pada webhook 900 ms. Yang
+ * berubah hanya keadaan setelah banjir: contoh berbeban
+ * berat tidak lagi diputar ulang saat instans sudah sepi.
+ *
+ * `longgar` dipakai ketika kuota kalibrasi habis dan tidak ada contoh sepadan: pakai
+ * contoh dengan beban paling ringan yang ada, karena meneruskan lagi bukan pilihan.
  */
-function targetJeda(): number {
-  if (perluKalibrasi()) return 0;
-  const jumlah = contohDurasiSah.length;
+function pilihContoh(sumber: Sumber): number | null {
+  const beban = bebanSekarang();
+  let layak = sumber.cincin.filter((contoh) => contoh.beban <= beban);
+  if (layak.length === 0) {
+    if (!sumber.longgar) return null;
+    const teringan = Math.min(...sumber.cincin.map((contoh) => contoh.beban));
+    layak = sumber.cincin.filter((contoh) => contoh.beban === teringan);
+  }
+  const jumlah = layak.length;
+  if (jumlah === 0) return null;
   const mundur = Math.min(jumlah - 1, Math.floor(-Math.log(1 - acak()) * KECONDONGAN_BARU));
-  return contohDurasiSah[jumlah - 1 - mundur] ?? 0;
+  const ms = layak[jumlah - 1 - mundur]?.ms;
+  return Number.isFinite(ms) && (ms as number) >= 0 ? (ms as number) : null;
+}
+
+/**
+ * Rencana jeda cabang jebakan: berapa lama menunggu, dan balasan mana yang ditiru.
+ * `null` = instans ini belum punya pengukuran yang mewakili keadaan sekarang, jadi
+ * permintaannya harus diteruskan (bukan dijeda 0 ms — itu persis oracle yang ditutup).
+ */
+type Rencana = { ms: number; sukses: boolean };
+
+function rencanaJeda(): Rencana | null {
+  const sumber = sumberJeda();
+  if (!sumber) return null;
+  const ms = pilihContoh(sumber);
+  return ms === null ? null : { ms, sukses: sumber.sukses };
 }
 
 /**
  * Cabang jebakan, sisi waktunya saja.
  *
- * `true`  = sudah dijeda selama ±RTT webhook, pemanggil boleh langsung membalas.
- * `false` = instans ini belum punya cukup pengukuran, jadi permintaan ini HARUS
- *           jatuh ke jalur kiriman sah (diteruskan ke webhook) supaya waktunya
- *           identik sekaligus mengukur. Lihat pilihan (3) di blok besar "Menutup
- *           oracle waktu" beserta harganya.
+ * `dijeda`   = sudah dijeda selama ±RTT webhook; pemanggil membalas seperti kiriman
+ *              sah yang berakhir sama (`sukses` → 200, selain itu → 502). Meniru
+ *              balasan GAGAL bukan kelonggaran: pada instans yang webhooknya memang
+ *              sedang gagal, 502 itulah yang diterima kiriman sah, jadi membalas 200
+ *              di sana justru membuka sumbu status.
+ * `teruskan` = instans ini tidak punya pengukuran yang mewakili keadaan sekarang,
+ *              jadi permintaan ini HARUS jatuh ke jalur kiriman sah (diteruskan ke
+ *              webhook) supaya waktunya identik sekaligus mengukur. Lihat pilihan (3)
+ *              di blok besar "Menutup oracle waktu" beserta harganya — dan kuotanya,
+ *              yang sekarang benar-benar ditegakkan (`sumberJeda`, urutan 1).
  */
-async function jedaSeolahDiteruskan(): Promise<boolean> {
+type HasilJeda = { jenis: "dijeda"; sukses: boolean } | { jenis: "teruskan" };
+
+async function jedaSeolahDiteruskan(): Promise<HasilJeda> {
   // Titik tempel: padanan persis dari titik tepat sebelum `fetch(webhook)` di
   // cabang kiriman sah. Semua tenggat di bawah dihitung dari sini.
   const titik = performance.now();
 
-  const langsung = targetJeda();
-  if (langsung > 0) {
-    await tidurSampai(titik + langsung);
-    return true;
+  const langsung = rencanaJeda();
+  if (langsung) {
+    await tidurSampai(titik + langsung.ms);
+    return { jenis: "dijeda", sukses: langsung.sukses };
   }
 
   const kalibrasi = kalibrasiBerjalan;
-  if (!kalibrasi) return false; // tidak ada yang sedang mengukur → giliran permintaan ini
+  // tidak ada yang sedang mengukur → giliran permintaan ini
+  if (!kalibrasi) return { jenis: "teruskan" };
 
   // Ada pengukuran yang sedang berjalan: ikut menunggunya selesai, lalu bayar
   // sisa waktunya. Total tetap ±selama kiriman sah, tanpa meneruskan apa pun.
   await kalibrasi;
-  const target = targetJeda();
-  if (target <= 0) return false; // masih kurang / pengukurannya gagal → ukur lagi
-  await tidurSampai(titik + target);
-  return true;
+  const sesudah = rencanaJeda();
+  if (!sesudah) return { jenis: "teruskan" }; // masih kurang → ukur lagi
+  await tidurSampai(titik + sesudah.ms);
+  return { jenis: "dijeda", sukses: sesudah.sukses };
 }
 
 // ————————————————————————————————————————————————————————————————
@@ -947,60 +1130,70 @@ export async function POST(req: NextRequest) {
   }
 
   if (honeypotTerisi(parsed.data.website)) {
-    // Terperangkap: balas persis seperti kiriman sukses, tapi TIDAK meneruskan
-    // apa pun ke webhook. Jedanya menyamakan sumbu terakhir yang masih membocorkan
-    // jebakan ini — waktu (G-19a, lihat blok penjelasan di atas).
-    if (await jedaSeolahDiteruskan()) return balas({ ok: true }, 200);
-    // `false` = cincin instans ini belum cukup / sudah basi. Tidak ada jeda yang
-    // bisa dikarang tanpa membocorkan jebakannya, jadi permintaan ini SENGAJA
-    // jatuh ke jalur di bawah apa adanya: diteruskan, diukur, dan sesudah itu
-    // cincin ikut segar. Ongkosnya dihitung di `perluKalibrasi`.
+    // Terperangkap: balas persis seperti kiriman sah yang berakhir sama, tapi TIDAK
+    // meneruskan apa pun ke webhook. Jedanya menyamakan sumbu terakhir yang masih
+    // membocorkan jebakan ini — waktu (G-19a, lihat blok penjelasan di atas).
+    const jeda = await jedaSeolahDiteruskan();
+    if (jeda.jenis === "dijeda") {
+      // Body, status, dan header dua cabang ini harus tetap identik dengan cabang
+      // kiriman sah di bawah. Jangan menambahkan field pembeda apa pun di sini.
+      return jeda.sukses ? balas({ ok: true }, 200) : balas({ error: PESAN_GAGAL }, 502);
+    }
+    // `teruskan` = instans ini belum punya pengukuran yang mewakili keadaan sekarang.
+    // Tidak ada jeda yang bisa dikarang tanpa membocorkan jebakannya, jadi permintaan
+    // ini SENGAJA jatuh ke jalur di bawah apa adanya: diteruskan, diukur, dan sesudah
+    // itu cincin ikut segar. Atapnya MAKS_KALIBRASI_JEBAKAN, ditegakkan di `sumberJeda`.
     jumlahKalibrasiJebakan += 1;
   }
 
   bukaKalibrasi();
-  let webhookSukses = false;
+  mulaiPanggilanWebhook();
   const mulaiWebhook = performance.now();
   try {
-    const res = await fetch(webhook, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(BATAS_WAKTU_WEBHOOK_MS),
-      body: JSON.stringify({
-        nama: amanUntukSpreadsheet(parsed.data.nama),
-        kontak: amanUntukSpreadsheet(parsed.data.kontak),
-        pesan: amanUntukSpreadsheet(parsed.data.pesan),
-        produk: parsed.data.produk ?? "lainnya",
-        diterima: new Date().toISOString(),
-      }),
-    });
+    let sukses = false;
+    let balasan: ReturnType<typeof balas>;
+    try {
+      const res = await fetch(webhook, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(BATAS_WAKTU_WEBHOOK_MS),
+        body: JSON.stringify({
+          nama: amanUntukSpreadsheet(parsed.data.nama),
+          kontak: amanUntukSpreadsheet(parsed.data.kontak),
+          pesan: amanUntukSpreadsheet(parsed.data.pesan),
+          produk: parsed.data.produk ?? "lainnya",
+          diterima: new Date().toISOString(),
+        }),
+      });
 
-    // Balasan webhook tidak dipakai — lepaskan koneksinya, jangan digantung.
-    await res.body?.cancel().catch(() => undefined);
+      // Balasan webhook tidak dipakai — lepaskan koneksinya, jangan digantung.
+      await res.body?.cancel().catch(() => undefined);
 
-    if (!res.ok) {
-      // Hanya status; JANGAN pernah mencatat isi form atau URL webhook (URL bisa
-      // memuat token rahasia).
-      console.error(`[lead] webhook menolak kiriman, status ${res.status}`);
-      return balas({ error: PESAN_GAGAL }, 502);
+      if (res.ok) {
+        sukses = true;
+        balasan = balas({ ok: true }, 200);
+      } else {
+        // Hanya status; JANGAN pernah mencatat isi form atau URL webhook (URL bisa
+        // memuat token rahasia).
+        console.error(`[lead] webhook menolak kiriman, status ${res.status}`);
+        balasan = balas({ error: PESAN_GAGAL }, 502);
+      }
+    } catch {
+      console.error("[lead] webhook tidak terjangkau atau melewati batas waktu");
+      balasan = balas({ error: PESAN_GAGAL }, 502);
     }
 
-    webhookSukses = true;
-  } catch {
-    console.error("[lead] webhook tidak terjangkau atau melewati batas waktu");
-    return balas({ error: PESAN_GAGAL }, 502);
+    // Diukur sampai titik terakhir sebelum balasan dikembalikan — itulah sisa waktu
+    // yang dihabiskan kiriman sah setelah titik tempel, dan itu yang ditiru cabang
+    // jebakan. Sukses dan gagal masuk cincin yang BERBEDA (lihat `contohGagal`).
+    catatDurasi(performance.now() - mulaiWebhook, sukses);
+    return balasan;
   } finally {
-    // Cabang gagal melepaskan jebakan yang menunggu di sini; cabang sukses
-    // melepaskannya SETELAH pengukuran masuk cincin (lihat di bawah), supaya yang
-    // menunggu tidak bangun ke cincin yang belum diperbarui.
-    if (!webhookSukses) tutupKalibrasi();
+    // Urutan wajib: `catatDurasi` sudah jalan (jadi jebakan yang menunggu bangun ke
+    // cincin yang sudah diperbarui) dan `puncakPanggilan` belum dinolkan (jadi
+    // pengukuran barusan tertandai beban yang benar).
+    selesaiPanggilanWebhook();
+    tutupKalibrasi();
   }
-
-  // Diukur sampai titik terakhir sebelum balasan disusun — itulah sisa waktu yang
-  // dihabiskan kiriman sah setelah titik tempel, dan itu yang ditiru cabang
-  // jebakan. HANYA untuk 2xx: lihat batas 4 di blok "Menutup oracle waktu".
-  catatDurasiSah(performance.now() - mulaiWebhook);
-  tutupKalibrasi();
-  return balas({ ok: true }, 200);
 }
