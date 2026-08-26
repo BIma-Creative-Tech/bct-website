@@ -491,6 +491,16 @@ function honeypotTerisi(nilai: unknown): boolean {
 // sampai ke owner cukup TIDAK mengisi jebakan — jalur itu selalu terbuka dan hanya
 // dibatasi rate limit. Jadi (3) tidak menambah satu pun kemampuan, ia hanya
 // memindahkan sejumlah kecil kiriman dari "dibuang diam-diam" menjadi "diteruskan".
+//
+// KALIMAT DI ATAS DULU TIDAK BENAR, dan itu ditemukan security-auditor (G-24).
+// Atapnya diperiksa SESUDAH "cincin belum terkalibrasi", padahal cincin hanya terisi
+// oleh panggilan 2xx — jadi sink yang tidak pernah sukses = cincin dingin permanen =
+// penerusan TANPA BATAS. Terukur pada versi lama: sink yang selalu 500 → 25 dari 25
+// muatan jebakan mendarat; sink yang membalas 200 setelah 6 detik (route menyerah di
+// 5 detik) → 8 dari 8 mendarat dan benar-benar diproses sink. Sesudah urutannya
+// dibalik dan durasi GAGAL ikut dicatat di cincin terpisah: 5 dari 25 dan 6 dari 8,
+// dan sisanya dibalas 502 dengan waktu yang ditiru dari panggilan gagal yang nyata.
+// Urutan pemeriksaannya sekarang dijaga di `sumberJeda`; jangan dibalik lagi.
 // Efek sampingnya justru baik untuk satu kelompok pengunjung sungguhan: manusia
 // yang jebakannya terisi pengelola kata sandi / autofill — leadnya sekarang
 // benar-benar sampai, bukan hilang senyap.
@@ -505,29 +515,42 @@ function honeypotTerisi(nilai: unknown): boolean {
 // 1. Cincin ini per instans, sama seperti rate limit (lihat G-16).
 // 2. Jedanya memang menahan slot server selama ±satu RTT webhook. Itu memang
 //    harganya: biaya permintaan jebakan dibuat sama dengan biaya kiriman sah.
-// 3. Sumbu STATUS masih setengah terbuka saat webhook gagal. Kondisi itu tidak
-//    cuma bisa DITUNGGU penyerang, tapi bisa ia SEBABKAN — auditor membedakan 4
-//    dari 8 ronde hanya dari status, dengan membanjiri 360 kiriman sah sampai sink
-//    yang menyerialkan mengantre melewati BATAS_WAKTU_WEBHOOK_MS; nol akses ke
-//    webhook, biaya hanya kiriman. Yang berubah setelah koreksi ini: pada instans
-//    yang cincinnya BELUM terkalibrasi, jebakan ikut menempuh jalur yang sama dan
-//    ikut dibalas 502 — terukur identik (502, body dan header sama persis). Yang
-//    masih bocor: instans yang cincinnya sudah panas SEBELUM webhook rusak; di
-//    sana jebakan dibalas 200 sementara kiriman sah dibalas 502. Sengaja tidak
-//    ditutup: menyembunyikannya berarti membalas "terkirim" untuk lead yang tidak
-//    sampai, dan itu dilarang (ADR 2026-08-25).
-// 4. Peracunan cincin DIPERSEMPIT, belum tertutup. Durasi yang berakhir GAGAL
-//    (non-2xx, tak terjangkau, lewat batas waktu) kini tidak dicatat sama sekali:
-//    kiriman sah yang gagal dibalas 502, jadi menirukan waktunya tidak ada guna,
-//    sementara mencatatnya membuat banjir-sampai-timeout mengisi cincin dengan
-//    4999 ms — persis pola yang dipakai auditor untuk memisahkan jebakan lewat uji
-//    satu sisi ">250 ms ⇒ jebakan". Yang tersisa: sink yang tetap SUKSES tapi
-//    lambat saat dibanjiri masih bisa menggeser cincin. Dua hal memperpendek
-//    umur geseran itu: contoh diambil dengan bobot condong ke pengukuran terbaru
-//    (luntur dalam hitungan ±1,5 kiriman sah, bukan 16), dan cincin yang tidak
-//    tersegarkan selama JEDA_KALIBRASI_MS diperbarui sendiri (lihat
-//    `perluKalibrasi`) sehingga penyerang tidak bisa lagi memprobe tanpa pernah
-//    membersihkan racunnya.
+// 3. Sumbu STATUS. Kondisi "webhook gagal" tidak cuma bisa DITUNGGU penyerang, tapi
+//    bisa ia SEBABKAN — auditor membedakan 4 dari 8 ronde hanya dari status, dengan
+//    membanjiri 360 kiriman sah sampai sink yang menyerialkan mengantre melewati
+//    BATAS_WAKTU_WEBHOOK_MS; nol akses ke webhook, biaya hanya kiriman. Sekarang
+//    cabang jebakan ikut MENIRU balasan gagal: kalau bukti yang layak ditiru berasal
+//    dari cincin panggilan gagal, jebakan dibalas 502 dengan body dan header yang
+//    sama persis. Terukur pada sink yang selalu 500: 25 dari 25 jebakan dibalas 502,
+//    5 karena benar-benar diteruskan dan 20 karena menirunya, dengan waktu yang
+//    saling tumpang tindih (45–63 ms vs 45–64 ms). Yang MASIH bocor: instans yang
+//    cincin suksesnya sudah panas SEBELUM webhook rusak; di sana cincin sukses tetap
+//    dipilih dan jebakan dibalas 200 sementara kiriman sah dibalas 502. Sengaja tidak
+//    ditutup dengan menyembunyikan kegagalan dari kiriman sah: itu berarti membalas
+//    "terkirim" untuk lead yang tidak sampai, dan itu dilarang (ADR 2026-08-25).
+// 4. Peracunan cincin. Durasi yang berakhir GAGAL tidak pernah masuk cincin sukses:
+//    mencampurnya membuat banjir-sampai-timeout mengisi cincin dengan 4999 ms —
+//    persis pola yang dipakai auditor untuk memisahkan jebakan lewat uji satu sisi
+//    ">250 ms ⇒ jebakan". Yang tersisa sesudah itu (dan yang ditemukan auditor pada
+//    G-24): sink yang tetap SUKSES tapi lambat saat dibanjiri. Terukur pada sink yang
+//    menyerialkan 200 ms, 40 kiriman sah serentak → 24 sukses bermedian 2553 ms
+//    menelan seluruh 8 slot; sesudah antrean sink kosong, 10 probe jebakan beruntun
+//    menghasilkan 4/10, 6/10, dan 4/10 probe di atas 250 ms (4485–5005 ms) dengan
+//    0/10 positif palsu — bobot condong-baru dan JEDA_KALIBRASI_MS TIDAK cukup,
+//    karena probe jebakan tidak menyegarkan cincin.
+//    Yang menutupnya: setiap pengukuran ditandai `beban` (puncak panggilan webhook
+//    serentak saat ia diukur) dan cabang jebakan hanya boleh memakai pengukuran yang
+//    bebannya tidak lebih berat daripada beban sekarang. Contoh dari masa sibuk tidak
+//    pernah diputar ulang saat instans sepi; sebaliknya, saat banjir masih berlangsung
+//    contoh berbeban berat justru yang dipakai, sehingga jebakan ikut lambat seperti
+//    kiriman sah. Terukur sesudah perbaikan pada rig yang sama: 0/10, 0/10, 0/10 di
+//    atas 250 ms (jebakan 214–248 ms vs sah 204–234 ms), 0/10 positif palsu, dengan
+//    satu kiriman jebakan diteruskan per ronde untuk menyegarkan cincin.
+// 5. Kuota kalibrasi adalah ATAP KERAS, dan sesudah habis instans ini berhenti
+//    belajar. Bukti yang dipakai lalu boleh datang dari beban yang tidak sepadan
+//    (`longgar` di `pilihContoh`) — itu tebakan terbaik yang masih berupa angka
+//    nyata, tapi tetap tebakan. Menaikkan MAKS_KALIBRASI_JEBAKAN memperpanjang masa
+//    belajar dengan harga spam yang lebih banyak; arah tukarnya ditulis di sana.
 const CONTOH_DURASI_MAKS = 8;
 
 /**
@@ -685,6 +708,10 @@ function catatDurasi(ms: number, sukses: boolean): void {
  * 2. MAKS_KALIBRASI_JEBAKAN membatasi berapa kali seumur proses cabang jebakan
  *    boleh meneruskan. Sesudah itu cincin memang membeku, dan itu diterima sebagai
  *    batas yang dicatat — bukan dibayar dengan spam tanpa batas ke sink owner.
+ *    Atap ini baru benar-benar berlaku sejak G-24: sebelumnya ia diperiksa sesudah
+ *    "cincin belum terkalibrasi" sehingga tidak pernah terbaca pada instans yang
+ *    webhooknya selalu gagal (25 dari 25 muatan jebakan mendarat di sink; sekarang 5).
+ *    Urutan pemeriksaan yang benar dijaga di `sumberJeda` — kuota lebih dulu.
  */
 const JEDA_KALIBRASI_MS = 10_000;
 const MAKS_KALIBRASI_JEBAKAN = 10;
@@ -831,9 +858,26 @@ let koreksiTidurMs = 0;
  * beberapa pencilan 15–16 ms beruntun menyeret koreksi sampai belasan milidetik,
  * dan sesudah itu jeda jebakan bangun SATU TIK TERLALU CEPAT — terukur jebakan
  * p25 32,3 ms padahal kiriman sah tidak pernah di bawah 32,8 ms (AUC 0,707).
- * Membatasinya membuat galat terburuk tetap terlambat sedikit, bukan lebih cepat
- * sekaligus; dan "sedikit terlambat" tidak membocorkan jebakan selama sebarannya
- * masih beririsan dengan kiriman sah.
+ *
+ * KOREKSI KLAIM (G-24). Baris di sini dulu berbunyi "galat terburuk tetap terlambat
+ * sedikit, bukan lebih cepat sekaligus". Itu TIDAK BENAR, dan auditor mengukurnya.
+ * Sisi "lebih cepat" ada, dan yang membatasinya bukan tanda galat melainkan klem
+ * ±5 ms di atas. Terukur pada webhook 900 ms tanpa gangguan apa pun: 5 dari 40
+ * jebakan selesai lebih cepat daripada kiriman sah TERCEPAT (jebakan min 900,2 ms
+ * vs sah min 902,5 ms). Yang bisa DIDORONG penyerang juga nyata: 120 jebakan
+ * serentak menggeser `koreksiTidurMs` lewat galat tidur yang sebenarnya mengukur
+ * antrean event loop — pada webhook 30 ms, median jebakan 46,6 → 45,7 ms dan
+ * "lebih cepat daripada sah tercepat" 1/40 → 5/40.
+ *
+ * Yang dikerjakan untuk itu: integral hanya berjalan ketika jeda ini SENDIRIAN
+ * (`jedaBerjalan`), karena galat di bawah beban tidak mengukur kekasaran tik. Terukur
+ * sesudahnya pada rig yang sama, versi ini, webhook 30 ms: median jebakan 62,2 → 61,7 ms
+ * dan "lebih cepat daripada sah tercepat" 3/40 → 0/40; webhook 900 ms 0/40 → 1/40.
+ * Geseran oleh banjir itulah yang hilang.
+ *
+ * Sisi "lebih cepat" SENDIRI tidak hilang dan tidak diklaim hilang: pada versi ini
+ * masih terukur 3/40 (webhook 30 ms, sebelum banjir apa pun). Yang menahannya cuma
+ * klem ±5 ms di atas. Jangan melebarkan klem ini tanpa mengukur ulang.
  */
 const KOREKSI_MIN_MS = -5;
 const KOREKSI_MAKS_MS = 5;
@@ -924,10 +968,12 @@ const KECONDONGAN_BARU = 1.5;
  *
  * Yang diambil hanya contoh dengan `beban` tidak lebih berat daripada beban saat ini.
  * Di keadaan tenang semua contoh berbeban 1 dan `bebanSekarang()` juga 1, jadi
- * saringan ini TIDAK mengubah apa pun — terukur AUC ABBA sebelum/sesudah saringan:
- * @@AUC30@@ pada webhook 30 ms dan @@AUC900@@ pada webhook 900 ms. Yang
- * berubah hanya keadaan setelah banjir: contoh berbeban
- * berat tidak lagi diputar ulang saat instans sudah sepi.
+ * saringan ini TIDAK mengubah apa pun di keadaan mapan. Terukur dengan rig ABBA
+ * (counterbalanced) pada versi tanpa hop penjadwal, sebelum → sesudah saringan:
+ * AUC 0,431 → 0,416 pada webhook 30 ms (n=300 per kelompok) dan 0,647 → 0,595 pada
+ * webhook 900 ms (n=60) — keduanya bergerak MENDEKATI 0,5, bukan menjauh. Yang
+ * berubah hanya keadaan setelah banjir: contoh berbeban berat tidak lagi diputar
+ * ulang saat instans sudah sepi.
  *
  * `longgar` dipakai ketika kuota kalibrasi habis dan tidak ada contoh sepadan: pakai
  * contoh dengan beban paling ringan yang ada, karena meneruskan lagi bukan pilihan.
@@ -1183,6 +1229,36 @@ export async function POST(req: NextRequest) {
       console.error("[lead] webhook tidak terjangkau atau melewati batas waktu");
       balasan = balas({ error: PESAN_GAGAL }, 502);
     }
+
+    // SATU HOP PENJADWAL, sengaja, supaya kedua cabang melewati jumlah hop yang sama
+    // (G-24, temuan MEDIUM auditor).
+    //
+    // Cabang jebakan selalu bangun dari `setTimeout`; cabang kiriman sah dulu tidak
+    // punya timer sama sekali, jadi hanya jebakan yang membayar kuantisasi tik
+    // penjadwal. Ekornya searah dan terukur: pada webhook 30 ms, n=300 per kelompok,
+    // 49/300 (16,3%) jebakan jatuh DI LUAR amplop kiriman sah — 46 di antaranya di
+    // atas, pada median+12,3…16,6 ms (satu tik Windows) — dengan rasio sd 3,38×.
+    // Ekor sepihak seperti itu bisa dipakai apa adanya: beberapa probe sudah cukup.
+    //
+    // Hop ini ada DI DALAM jendela ukur, jadi ongkosnya ikut terekam ke cincin dan
+    // ikut diputar ulang cabang jebakan — itu syaratnya. (Percobaan lama menaruh
+    // penyamaran serupa DI LUAR jendela ukur dan hasilnya lebih buruk: kiriman sah
+    // med 62,0 ms vs jebakan 47,0 ms, AUC 0,868. Lihat blok "TIDAK ADA JITTER BUATAN".)
+    //
+    // Terukur sesudah perubahan ini, rig dan n yang sama, tiga ronde: 8/300 (2,7%),
+    // 7/300 (2,3%), dan 9/300 (3,0%) di luar amplop, rasio sd 1,06× / 1,11× / 1,01×.
+    // Ekor SEARAH-nya yang hilang: pada ronde terakhir hanya 2 dari 300 di atas amplop
+    // dan cuma median+2,4 ms, bukan lagi median+14 ms. AUC 0,540 / 0,571 / 0,523;
+    // dua ronde baseline pada rig yang sama 0,431 dan 0,424 — sama-sama meleset dari
+    // 0,5 dan tidak lebih jauh.
+    //
+    // HARGANYA, supaya bisa dicabut sadar: setiap kiriman sah jadi satu tik lebih
+    // lambat. Terukur di mesin uji (Windows) median 46,6 → 61,8 ms, +15,2 ms. Besarnya
+    // = satu tik penjadwal OS, jadi di Linux/Vercel jauh lebih pendek — TIDAK diukur
+    // di sini, jangan mengarang angkanya. 15 ms pada permintaan yang memang sudah
+    // memakan ratusan milidetik tidak terlihat manusia; kalau suatu saat terlihat,
+    // yang dibuang adalah baris ini, dan ekor satu tik itu kembali.
+    await new Promise<void>((selesai) => setTimeout(selesai, 0));
 
     // Diukur sampai titik terakhir sebelum balasan dikembalikan — itulah sisa waktu
     // yang dihabiskan kiriman sah setelah titik tempel, dan itu yang ditiru cabang
