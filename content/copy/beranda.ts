@@ -1,18 +1,30 @@
+import type { KunciBukti } from "../site";
 import type { BlokCta, HeroCopy, KepalaSection, Langkah, MetaCopy } from "./types";
 
 /**
  * Copy Beranda.
  *
  * Kartu produk dirender dari `produk[]` di content/site.ts (nama + ringkas).
- * Angka bukti dirender dari `bukti[]` di content/site.ts; `buktiDetail` di bawah
- * hanya menambahkan kalimat penjelas dan dicocokkan lewat field `kunci`.
+ * Angka bukti dirender dari `bukti[]` di content/site.ts; `bukti.detail` di bawah
+ * hanya menambahkan kalimat penjelas, dipasangkan lewat `kunci` (lihat di bawah).
  */
 
-export type BuktiDetail = {
-  /** Cocokkan manual dengan urutan `bukti[]` di content/site.ts. */
-  kunci: "pengalaman" | "komdigi" | "retail";
-  teks: string;
-};
+/**
+ * Kalimat penjelas tiap butir bukti, DIKUNCI ke `bukti[].kunci` di content/site.ts.
+ *
+ * Bentuknya `Record`, bukan array, dan itu inti perbaikan G-24. Tiga akibatnya:
+ * 1. Urutan penulisan di bawah tidak berpengaruh apa pun — urutan tayang datang dari
+ *    `bukti[]`, jadi menukar baris di sana tidak bisa memindahkan paragraf ke angka
+ *    yang salah (sebelumnya bisa, tanpa satu pun gerbang menyalak).
+ * 2. Butir bukti baru tanpa kalimat di sini = `tsc`/`next build` GAGAL (TS2741,
+ *    menyebut kunci yang kalimatnya belum ditulis).
+ * 3. Kalimat yatim (kuncinya sudah dihapus dari `bukti[]`) = GAGAL juga (TS2353).
+ *
+ * Union kuncinya TIDAK ditulis tangan di sini; ia diimpor sebagai `KunciBukti` dari
+ * content/site.ts (`import type` — terhapus saat kompilasi). Pola yang sama dengan
+ * `SlugProduk` di content/copy/types.ts dan `produkCopy` di content/copy/index.ts.
+ */
+export type BuktiDetail = Record<KunciBukti, string>;
 
 export type BerandaCopy = {
   meta: MetaCopy;
@@ -20,7 +32,7 @@ export type BerandaCopy = {
   produk: KepalaSection;
   bukti: {
     kepala: KepalaSection;
-    detail: BuktiDetail[];
+    detail: BuktiDetail;
     tautan: { label: string; href: string };
   };
   caraKerja: {
@@ -64,23 +76,17 @@ export const beranda: BerandaCopy = {
       judul: "Bukti dulu, janji belakangan.",
       teks: "Prinsip kerja kami: demo mengalahkan pitch. Ini yang bisa kami buktikan hari ini — selebihnya sebaiknya Anda uji sendiri lewat demo.",
     },
-    detail: [
-      {
-        kunci: "pengalaman",
-        teks: "Lebih dari sepuluh tahun membangun dan merawat aplikasi enterprise — termasuk bagian yang jarang dibicarakan vendor: menjaga sistem tetap hidup setelah serah terima.",
-      },
-      {
-        kunci: "komdigi",
-        // [TANYA-OWNER] Nama resmi instansi yang boleh ditulis di situs publik: "KOMDIGI" saja,
-        // atau nama panjang kementerian? Perlu juga: tahun pengerjaan, peran Ade (lead dev/dev),
-        // dan apakah nama proyek boleh disebut publik (izin klien).
-        teks: "Aplikasi web perizinan e-Telekomunikasi untuk KOMDIGI — sistem perizinan di lingkungan instansi pemerintah, tempat alur dan aturannya tidak bisa ditawar.",
-      },
-      {
-        kunci: "retail",
-        teks: "Pemahaman operasional retail datang dari pengalaman langsung menanganinya, bukan dari riset pasar. Itu sebabnya ceruk ini yang kami pilih.",
-      },
-    ],
+    detail: {
+      pengalaman:
+        "Lebih dari sepuluh tahun membangun dan merawat aplikasi enterprise — termasuk bagian yang jarang dibicarakan vendor: menjaga sistem tetap hidup setelah serah terima.",
+      // [TANYA-OWNER] Nama resmi instansi yang boleh ditulis di situs publik: "KOMDIGI" saja,
+      // atau nama panjang kementerian? Perlu juga: tahun pengerjaan, peran Ade (lead dev/dev),
+      // dan apakah nama proyek boleh disebut publik (izin klien).
+      komdigi:
+        "Aplikasi web perizinan e-Telekomunikasi untuk KOMDIGI — sistem perizinan di lingkungan instansi pemerintah, tempat alur dan aturannya tidak bisa ditawar.",
+      retail:
+        "Pemahaman operasional retail datang dari pengalaman langsung menanganinya, bukan dari riset pasar. Itu sebabnya ceruk ini yang kami pilih.",
+    },
     tautan: {
       label: "Lihat studi kasus",
       href: "/studi-kasus",

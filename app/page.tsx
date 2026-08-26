@@ -48,15 +48,19 @@ export const metadata: Metadata = {
 
 /**
  * Angka & label bukti berasal dari `bukti[]` (content/site.ts); kalimat penjelas
- * dari `beranda.bukti.detail[]`. Pencocokannya MENGIKUTI URUTAN ARRAY — lihat
- * komentar `kunci` di content/copy/beranda.ts. `.at()` mengembalikan `undefined`
- * bila panjang kedua array tidak sama, sehingga blok penjelas cukup tidak
- * dirender (tidak pernah muncul "undefined" atau error).
+ * dari `beranda.bukti.detail`. Pasangannya ditentukan `kunci`, BUKAN posisi array
+ * (G-24): urutan baris di content/site.ts hanya mengatur urutan tayang, jadi
+ * menukarnya tidak bisa lagi memindahkan paragraf ke angka yang salah.
+ *
+ * Tidak ada penjagaan `undefined` di sini karena tidak bisa ada: `detail` bertipe
+ * `Record<KunciBukti, string>` yang total terhadap `bukti[]`, jadi butir tanpa
+ * kalimat ditolak `tsc`/`next build` jauh sebelum halaman ini dirender.
  */
-const daftarBukti = bukti.map((item, indeks) => ({
+const daftarBukti = bukti.map((item) => ({
+  kunci: item.kunci,
   angka: item.angka,
   label: item.label,
-  detail: beranda.bukti.detail.at(indeks)?.teks,
+  detail: beranda.bukti.detail[item.kunci],
 }));
 
 const heroSekunder = tautanHidup(beranda.hero.sekunder);
@@ -152,14 +156,12 @@ export default function Home() {
 
         <ul className="mt-10 grid gap-8 sm:grid-cols-3">
           {daftarBukti.map((item) => (
-            <li key={item.label} className="border-t border-line pt-5">
+            <li key={item.kunci} className="border-t border-line pt-5">
               <h3 className="font-display text-2xl font-extrabold text-ink">{item.angka}</h3>
               <p className="mt-2 font-mono text-xs uppercase tracking-[0.14em] text-muted">
                 {item.label}
               </p>
-              {item.detail ? (
-                <p className="mt-4 max-w-[65ch] text-sm text-ink-2">{item.detail}</p>
-              ) : null}
+              <p className="mt-4 max-w-[65ch] text-sm text-ink-2">{item.detail}</p>
             </li>
           ))}
         </ul>

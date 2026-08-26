@@ -150,8 +150,42 @@ export const produk = [
  */
 export type SlugProduk = (typeof produk)[number]["slug"];
 
+/**
+ * Satu butir rekam jejak. `readonly` di tiap field karena `bukti` di bawah
+ * dideklarasikan `as const` — alasannya sama dengan `Produk`/`Paket` di atas.
+ */
+export type Bukti = {
+  /** Kunci pemasangan ke kalimat penjelas di copy. BUKAN teks yang tayang. */
+  readonly kunci: string;
+  readonly angka: string;
+  readonly label: string;
+};
+
+/**
+ * `as const satisfies readonly Bukti[]` — alasannya persis sama dengan `produk`
+ * di atas: `satisfies` menjaga bentuk tiap entri, `as const` menahan literal
+ * `kunci` agar `KunciBukti` di bawah bisa DITURUNKAN dari data ini.
+ *
+ * `kunci` ada karena beranda memasangkan angka+label ini dengan kalimat penjelas
+ * di `beranda.bukti.detail` (content/copy/beranda.ts). Sebelum G-24 pemasangan itu
+ * memakai INDEKS array: menukar dua baris di bawah membuat angka "KOMDIGI"
+ * berpasangan dengan paragraf milik "10+ tahun", dan lint/tsc/build tetap exit 0
+ * (diukur qa-reviewer 2026-08-26). Sekarang pasangannya ditentukan `kunci`, jadi
+ * urutan baris di sini hanya mengatur URUTAN TAYANG — bukan siapa berpasangan
+ * dengan siapa.
+ */
 export const bukti = [
-  { angka: "10+ tahun", label: "pengalaman industri IT & enterprise apps" },
-  { angka: "KOMDIGI", label: "webapp perizinan e-Telekomunikasi" },
-  { angka: "Retail", label: "domain expertise dari pengalaman langsung" },
-] as const;
+  { kunci: "pengalaman", angka: "10+ tahun", label: "pengalaman industri IT & enterprise apps" },
+  { kunci: "komdigi", angka: "KOMDIGI", label: "webapp perizinan e-Telekomunikasi" },
+  { kunci: "retail", angka: "Retail", label: "domain expertise dari pengalaman langsung" },
+] as const satisfies readonly Bukti[];
+
+/**
+ * Union kunci bukti — DITURUNKAN dari `bukti` di atas, jangan pernah ditulis ulang.
+ *
+ * Pengikat antara berkas ini dan copy: `BuktiDetail` di content/copy/beranda.ts
+ * adalah `Record<KunciBukti, string>`, sehingga menambah butir di sini tanpa menulis
+ * kalimatnya — atau menghapus butir dan meninggalkan kalimat yatim — membuat
+ * `tsc`/`next build` GAGAL sambil menyebut kuncinya, bukan diam-diam terbit.
+ */
+export type KunciBukti = (typeof bukti)[number]["kunci"];
