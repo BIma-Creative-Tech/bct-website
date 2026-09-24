@@ -10,3 +10,6 @@ npm-debug.log*
 .vercel
 *.tsbuildinfo
 next-env.d.ts
+
+# Peta navigasi lokal (dibuat Claude Code, tidak di-commit)
+SYSTEM_MAP.md

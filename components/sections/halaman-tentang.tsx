@@ -19,7 +19,7 @@ import { SectionHalaman } from "./section-halaman";
  * dari content/site.ts (lewat <DaftarBukti> dan komponen bersama). Tidak ada satu pun
  * kalimat, angka, nomor WhatsApp, atau alamat email yang diketik di file ini.
  *
- * Urutan section mengikuti urutan field pada `TentangCopy`: hero > posisi > siapa >
+ * Urutan section mengikuti urutan field pada `TentangCopy`: hero > visi & misi > siapa >
  * mesin > prinsip > rekam jejak > penutup. Latar `surface` dipasang berselang agar
  * irama visualnya sama dengan halaman produk dan /pricing; section yang isinya kartu
  * `bg-surface` (prinsip, lewat <DaftarPoin>) sengaja jatuh di latar `bg` supaya
@@ -34,7 +34,7 @@ import { SectionHalaman } from "./section-halaman";
 
 const ID_JUDUL = {
   hero: "judul-utama",
-  posisi: "judul-posisi",
+  visiMisi: "judul-visi-misi",
   siapa: "judul-siapa",
   mesin: "judul-mesin",
   prinsip: "judul-prinsip",
@@ -44,14 +44,27 @@ const ID_JUDUL = {
 
 export function HalamanTentang({ copy }: { copy: TentangCopy }) {
   const tautanRekamJejak = tautanHidup(copy.rekamJejak.tautan);
+  const idJudulVisiMisi = copy.visiMisi.map((_, i) => `${ID_JUDUL.visiMisi}-${i + 1}`);
 
   return (
     <>
       <HeroHalaman hero={copy.hero} idJudul={ID_JUDUL.hero} />
 
-      <SectionHalaman idJudul={ID_JUDUL.posisi} latar="surface">
-        <KepalaSection kepala={copy.posisi.kepala} idJudul={ID_JUDUL.posisi} />
-        <BlokParagraf paragraf={copy.posisi.paragraf} />
+      {/* Visi & misi: section tanpa kepala. Judul kartu ("Visi"/"Misi") menjadi
+          <h2> agar outline tetap h1 → h2, dan nama aksesibel section-nya
+          gabungan keduanya (aria-labelledby menerima beberapa id). Kartu berlatar
+          `bg`, bukan `bg-surface` (<DaftarPoin>), karena berada di pita surface. */}
+      <SectionHalaman idJudul={idJudulVisiMisi.join(" ")} latar="surface">
+        <ul className="grid gap-4 sm:grid-cols-2">
+          {copy.visiMisi.map((item, i) => (
+            <li key={item.judul} className="rounded-2xl border border-line bg-bg p-6">
+              <h2 id={idJudulVisiMisi[i]} className="font-display text-2xl font-extrabold text-ink">
+                {item.judul}
+              </h2>
+              <p className="mt-3 max-w-[65ch] text-ink-2">{item.teks}</p>
+            </li>
+          ))}
+        </ul>
       </SectionHalaman>
 
       <SectionHalaman idJudul={ID_JUDUL.siapa}>

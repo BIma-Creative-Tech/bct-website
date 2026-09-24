@@ -20,10 +20,8 @@ export type MesinBisnis = {
 export type TentangCopy = {
   meta: MetaCopy;
   hero: HeroCopy;
-  posisi: {
-    kepala: KepalaSection;
-    paragraf: string[];
-  };
+  /** Visi lalu misi — `judul` = judul kartu ("Visi"/"Misi"), `teks` = isinya. */
+  visiMisi: Poin[];
   siapa: {
     kepala: KepalaSection;
     paragraf: string[];
@@ -53,29 +51,29 @@ export const tentang: TentangCopy = {
 
   hero: {
     eyebrow: "Tentang kami",
-    judul: "Kecil, dan itu memang disengaja.",
-    teks: "Kami membangun sistem operasional untuk usaha kecil dan menengah Indonesia. Ruang lingkupnya sengaja sempit: ERP, dashboard data, dan aplikasi web. Pekerjaan yang tidak bisa kami rawat, tidak kami ambil.",
+    judul: "Bima Creative Technology",
+    teks: "Bima Creative Technology adalah penyedia solusi teknologi rintisan yang berspesialisasi dalam implementasi ERP menggunakan ODOO, pengembangan sistem sesuai kebutuhan, serta rangkaian layanan TI yang komprehensif. Dengan komitmen terhadap inovasi dan keunggulan, kami memberdayakan bisnis untuk mengoptimalkan operasional mereka dan mencapai pertumbuhan berkelanjutan melalui solusi teknologi mutakhir.",
     primer: {
-      label: "Kenalan via WhatsApp",
+      label: "Kontak via WhatsApp",
       pesan: "Halo BCT, saya baru baca profil perusahaan Anda dan ingin kenalan.",
     },
     sekunder: {
-      label: "Lihat rate card",
+      label: "Lihat Rate Card",
       href: "/pricing",
     },
   },
 
-  posisi: {
-    kepala: {
-      eyebrow: "Posisi",
-      judul: "Bukan agensi, bukan software house besar.",
+  // Sumber: rumusan visi & misi dari owner (EN), diterjemahkan 2026-09-24.
+  visiMisi: [
+    {
+      judul: "Visi",
+      teks: "Menjadi penyedia terkemuka solusi teknologi yang mentransformasi bisnis, dikenal secara global karena inovasi, keandalan, dan komitmen kami memberdayakan bisnis. Kami ingin mengubah cara industri bekerja lewat teknologi mutakhir, sehingga klien kami dapat meraih keberhasilan dan pertumbuhan yang melampaui capaian sebelumnya.",
     },
-    paragraf: [
-      "Kebanyakan usaha kecil di Indonesia berhadapan dengan dua pilihan yang sama-sama tidak nyaman: vendor besar dengan harga korporat dan proses berbulan-bulan, atau freelancer murah yang menghilang setelah invoice terakhir dibayar.",
-      "Kami mengambil posisi di antara keduanya. Scope dan harga ditulis di depan seperti produk, pengerjaannya ditangani orang yang benar-benar mengerti sistemnya, dan hubungannya dirancang untuk berlanjut lewat perawatan — bukan berhenti di serah terima.",
-      "Konsekuensinya kami harus memilih. Fokus kami retail dan distribusi, ditambah kebutuhan kepatuhan lokal seperti akuntansi dan pajak Indonesia. Di luar itu, kami lebih sering menolak daripada memaksakan.",
-    ],
-  },
+    {
+      judul: "Misi",
+      teks: "Menghadirkan solusi teknologi unggul yang disesuaikan dengan kebutuhan unik setiap klien. Kami berupaya melampaui harapan dengan memadukan keahlian, kreativitas, dan dedikasi pada inovasi. Kami membangun kemitraan jangka panjang dengan klien, membantu mereka berkembang di lanskap digital yang terus berubah melalui layanan kami yang menyeluruh dan komitmen teguh pada kualitas.",
+    },
+  ],
 
   siapa: {
     kepala: {

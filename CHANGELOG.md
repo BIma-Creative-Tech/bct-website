@@ -31,6 +31,7 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ### Changed
 
+- W2-13: `/tentang` — section posisi ("Bukan agensi, bukan software house besar." + tiga paragraf) diganti section visi & misi BCT: dua kartu dari field baru `visiMisi` di `content/copy/tentang.ts` (menggantikan `posisi`), teks diterjemahkan ke Bahasa Indonesia dari rumusan owner. Judul kartu "Visi"/"Misi" dirender sebagai `<h2>` dan menjadi nama aksesibel section-nya.
 - W3-01: `components/sections/metadata-halaman.ts`, `app/page.tsx`, dan `app/not-found.tsx` — komentar saja, nol perubahan perilaku dan nol perubahan output metadata. Ketiganya menyatakan "berkas OG belum ada, menyusul di W3-01"; diganti penjelasan terbalik yang sekarang berlaku: `openGraph.images` HARUS tetap TIDAK disetel supaya gambar berkas konvensi tersisipkan, karena Next mensyaratkan `!source.openGraph.hasOwnProperty('images')` di `mergeStaticMetadata` (`node_modules/next/dist/lib/metadata/resolve-metadata.js:149`) — menuliskan `images`, termasuk `images: []`, akan mematikan `og:image` di semua halaman yang memakai helper itu sekaligus. `app/not-found.tsx` juga mencatat bahwa `og:image`-nya diwarisi dari `app/opengraph-image.tsx` (kartu beranda) karena ia satu segmen dengan root layout — disengaja: 404 ber-`noindex` dan kartu bermerek lebih baik daripada nol gambar.
 
 
