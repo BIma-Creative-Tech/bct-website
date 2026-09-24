@@ -35,8 +35,8 @@ export default async function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "#96660f", // --accent
-          color: "#f6f5f1", // --bg
+          backgroundColor: "#b20a2c", // --accent
+          color: "#fffbd5", // --bg
           borderRadius: 6,
           fontFamily: "Bricolage Grotesque",
           fontSize: 24,

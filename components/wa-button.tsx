@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { waLink } from "@/content/site";
-import { kelas, tombolPrimer, tombolSekunder } from "./styles";
+import { kelas, panahTombol, tombolPrimer, tombolSekunder } from "./styles";
 
 /**
  * Tombol yang membuka WhatsApp. Nomor WA TIDAK pernah ditulis di komponen —
@@ -17,6 +17,7 @@ export function WaButton({
   ariaLabel,
   className,
   onClick,
+  panah = false,
 }: {
   pesan: string;
   children: ReactNode;
@@ -25,6 +26,8 @@ export function WaButton({
   className?: string;
   /** Opsional, hanya dipakai dari client component (mis. menutup menu mobile). */
   onClick?: () => void;
+  /** Tampilkan panah dekoratif yang bergeser saat hover (CTA utama). */
+  panah?: boolean;
 }) {
   return (
     <a
@@ -36,6 +39,11 @@ export function WaButton({
       className={kelas(varian === "primer" ? tombolPrimer : tombolSekunder, className)}
     >
       {children}
+      {panah ? (
+        <span aria-hidden="true" className={panahTombol}>
+          &rarr;
+        </span>
+      ) : null}
     </a>
   );
 }

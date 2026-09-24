@@ -31,7 +31,11 @@ const nilaiTampil: Record<JalurKontak["nilaiDari"], string | null> = {
 };
 
 export function DaftarJalurKontak({ item }: { item: JalurKontak[] }) {
-  const tampil = item.filter((jalur) => jalur.nilaiDari !== "email");
+  // Kartu lokasi hanya tayang bila `site.location` diisi: kartu "Lokasi" tanpa
+  // lokasinya menyesatkan. Owner mengosongkan nilai itu per 2026-09-25.
+  const tampil = item.filter(
+    (jalur) => jalur.nilaiDari !== "email" && !(jalur.nilaiDari === "location" && !site.location),
+  );
 
   return (
     <ul className="mt-10 grid gap-4 sm:grid-cols-2">

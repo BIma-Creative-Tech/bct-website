@@ -1,4 +1,4 @@
-import { kelas } from "@/components/styles";
+import { kartuInteraktif, kelas } from "@/components/styles";
 import { WaButton } from "@/components/wa-button";
 import type { Paket } from "@/content/site";
 import { DaftarTanda } from "./daftar-tanda";
@@ -43,7 +43,10 @@ export function DaftarPaket({
       {paket.map((item) => (
         <li
           key={item.nama}
-          className="flex flex-col rounded-2xl border border-line bg-surface p-6 sm:p-8"
+          className={kelas(
+            "muncul-saat-gulir flex flex-col rounded-2xl border border-line bg-surface p-6 sm:p-8",
+            kartuInteraktif,
+          )}
         >
           <JudulPaket className="font-display text-xl font-bold text-ink">{item.nama}</JudulPaket>
 

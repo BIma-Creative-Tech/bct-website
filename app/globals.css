@@ -1,16 +1,21 @@
 @import "tailwindcss";
 
-/* Design tokens BCT — JANGAN tambah warna di luar token ini (lihat CLAUDE.md) */
+/* Design tokens BCT — JANGAN tambah warna di luar token ini (lihat CLAUDE.md).
+   Palet merah→krem (ADR 2026-09-24), turunan gradien owner
+   linear-gradient(to right, #b20a2c, #fffbd5). Gradien hanya dipakai sebagai
+   pita dekoratif (utilitas `bg-gradien`), TIDAK pernah sebagai latar teks:
+   tidak ada satu warna teks yang lolos AA di sepanjang merah→krem. */
 :root {
-  --bg: #f6f5f1;
-  --surface: #fcfcfb;
-  --surface-2: #efeee8;
+  --bg: #fffbd5;
+  --surface: #fffdf0;
+  --surface-2: #f7f0c6;
   --ink: #191813;
   --ink-2: #54524c;
   --muted: #8b8880;
-  --line: #e3e1d8;
-  --accent: #96660f;
-  --accent-soft: rgba(150, 102, 15, 0.09);
+  --line: #e8dfae;
+  --accent: #b20a2c;
+  --accent-soft: rgba(178, 10, 44, 0.08);
+  --gradien: linear-gradient(to right, #b20a2c, #fffbd5);
   color-scheme: light;
 }
 
@@ -23,10 +28,121 @@
     --ink-2: #c3c2b7;
     --muted: #8b8880;
     --line: #2c2c2a;
-    --accent: #d9a84e;
-    --accent-soft: rgba(217, 168, 78, 0.10);
+    /* Merah dicerahkan agar lolos AA di latar gelap (5,8:1 di bg, 5,2:1 di surface). */
+    --accent: #f0566f;
+    --accent-soft: rgba(240, 86, 111, 0.10);
+    /* Gradien diredam: krem di ujung kanan dibuat transparan supaya tidak
+       menyilaukan di atas latar gelap. */
+    --gradien: linear-gradient(to right, #b20a2c, rgba(255, 251, 213, 0.35));
     color-scheme: dark;
   }
+}
+
+/* Tema gelap lokal untuk blok di atas foto (hero beranda): nilainya SAMA PERSIS
+   dengan palet dark di atas (kontrasnya sudah diukur, ADR 2026-09-24), jadi bukan
+   warna baru. Dipasang lewat kelas, sehingga blok itu tetap gelap di light mode dan
+   semua komponen di dalamnya (Eyebrow, tombol, teks) ikut menyesuaikan sendiri. */
+.tema-gelap {
+  --bg: #0e0d0b;
+  --surface: #1a1a19;
+  --surface-2: #232320;
+  --ink: #f2f0e9;
+  --ink-2: #c3c2b7;
+  --muted: #8b8880;
+  --line: #2c2c2a;
+  --accent: #f0566f;
+  --accent-soft: rgba(240, 86, 111, 0.10);
+  color-scheme: dark;
+}
+
+/* Lapisan gelap di atas foto hero, warnanya --bg tema gelap. Opasitas dihitung
+   untuk kasus terburuk (piksel foto putih di bawah teks):
+   - `bg-selubung-rata` (mobile, teks selebar layar): 0,90 → ink 12,5:1, ink-2 7,9:1,
+     accent 4,5:1.
+   - `bg-selubung-foto` (lg+, teks di separuh kiri): 0,94 di kiri → 0,85 di 55% →
+     0,5 di kanan tempat subjek foto; di ujung paragraf (±62%) ink-2 masih 6:1. */
+@utility bg-selubung-rata {
+  background-color: rgba(14, 13, 11, 0.9);
+}
+@utility bg-selubung-foto {
+  background-color: transparent;
+  background-image: linear-gradient(
+    to right,
+    rgba(14, 13, 11, 0.94) 0%,
+    rgba(14, 13, 11, 0.85) 55%,
+    rgba(14, 13, 11, 0.5) 100%
+  );
+}
+
+/* ————————————————————————————————————————————————————————————————
+   Gerak & efek (diadaptasi dari referensi v0 "modern landing page", G-29).
+   Semuanya CSS murni, tanpa dependensi. Keyframes memakai `transform`, sedangkan
+   utilitas hover Tailwind v4 (`-translate-y-*`, `scale-*`, `rotate-*`) memakai
+   properti `translate`/`scale`/`rotate` yang terpisah — jadi animasi masuk yang
+   tertahan (`fill-mode: both`) tidak pernah mengunci efek hover.
+   ———————————————————————————————————————————————————————————————— */
+
+@keyframes melayang {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes muncul-naik {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Coretan garis bawah kata sorotan: path ber-pathLength=100 digambar dari kiri. */
+@keyframes gambar-garis {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
+@theme {
+  --animate-melayang: melayang 7s ease-in-out infinite;
+  --animate-muncul-naik: muncul-naik 0.8s ease-out both;
+  --animate-gambar-garis: gambar-garis 0.9s ease-out 0.6s both;
+}
+
+/* Muncul saat digulir — scroll-driven animation, tanpa JavaScript. Peningkatan
+   progresif: peramban tanpa `animation-timeline` (dan pengunjung yang meminta
+   pengurangan gerak) langsung melihat elemennya utuh. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .muncul-saat-gulir {
+      animation: muncul-naik linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 70%;
+    }
+  }
+}
+
+/* Header: padat di puncak halaman, lalu transparan-blur + bayangan setelah digulir
+   ±120 px (scroll-driven, tanpa listener JS). Tanpa dukungan: tetap padat. */
+@keyframes header-tergulir {
+  to {
+    background-color: color-mix(in srgb, var(--bg) 78%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.45);
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .header-gulir {
+    animation: header-tergulir linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 120px;
+  }
+}
+
+/* Gulir halus untuk tautan jangkar (#rekam-jejak), dimatikan untuk
+   prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+/* Pita gradien merek. Dekoratif saja — selalu dipasang dengan aria-hidden. */
+@utility bg-gradien {
+  background-image: var(--gradien);
 }
 
 @theme inline {

@@ -1,5 +1,5 @@
 import type { KunciBukti } from "../site";
-import type { BlokCta, HeroCopy, KepalaSection, Langkah, MetaCopy } from "./types";
+import type { BlokCta, CtaTautan, HeroCopy, KepalaSection, Langkah, MetaCopy } from "./types";
 
 /**
  * Copy Beranda.
@@ -26,9 +26,25 @@ import type { BlokCta, HeroCopy, KepalaSection, Langkah, MetaCopy } from "./type
  */
 export type BuktiDetail = Record<KunciBukti, string>;
 
+/**
+ * Hero beranda = HeroCopy tanpa `sekunder`, diganti `portofolio`.
+ *
+ * `portofolio.href` adalah tujuan sebenarnya (/studi-kasus). Selama rutenya belum
+ * hidup (W2-03, content/rute.ts) tombolnya memakai `hrefSementara` — jangkar ke
+ * section rekam jejak di beranda — lalu pindah sendiri begitu rutenya didaftarkan.
+ */
+export type BerandaHero = Omit<HeroCopy, "sekunder"> & {
+  portofolio: CtaTautan & { hrefSementara: string };
+  /**
+   * Kata di dalam `judul` yang disorot warna aksen + coretan garis bawah (G-29).
+   * Harus muncul persis di `judul`; bila tidak ditemukan, judul tampil polos.
+   */
+  judulSorot: string;
+};
+
 export type BerandaCopy = {
   meta: MetaCopy;
-  hero: HeroCopy;
+  hero: BerandaHero;
   produk: KepalaSection;
   bukti: {
     kepala: KepalaSection;
@@ -51,16 +67,18 @@ export const beranda: BerandaCopy = {
 
   hero: {
     // Komponen boleh menambahkan `site.location` setelah eyebrow ini.
-    eyebrow: "Studio teknologi untuk UKM Indonesia",
-    judul: "Sistem yang membuat bisnis Anda tahu, bukan menebak.",
-    teks: "Kami merancang dan membangun sistem operasional untuk usaha kecil dan menengah: ERP, dashboard data yang bisa ditanyai dalam Bahasa Indonesia, dan aplikasi web. Scope ditulis di depan, harga terbuka, dan yang mengerjakan adalah orang yang Anda ajak bicara.",
+    eyebrow: "Technology Partner untuk Bisnis yang Ingin Tumbuh Lebih Terukur",
+    judul: "Teknologi yang Dibangun untuk Cara Bisnis Anda Bekerja.",
+    judulSorot: "tahu",
+    teks: "Kami merancang dan membangun ERP, sistem operasional, dashboard data, dan aplikasi web yang disesuaikan dengan kebutuhan bisnis Anda, sehingga data lebih mudah dipahami, proses lebih terstruktur, dan keputusan dapat diambil dengan dasar yang lebih kuat.",
     primer: {
-      label: "Konsultasi via WhatsApp",
+      label: "Hubungi Kami",
       pesan: "Halo BCT, saya ingin konsultasi kebutuhan sistem bisnis saya.",
     },
-    sekunder: {
-      label: "Lihat rate card",
-      href: "/pricing",
+    portofolio: {
+      label: "Lihat Portofolio Kami",
+      href: "/studi-kasus",
+      hrefSementara: "#rekam-jejak",
     },
   },
 

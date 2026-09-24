@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { tautanTeks } from "@/components/styles";
+import { kartuInteraktif, kelas, tautanTeks } from "@/components/styles";
 import type { TentangCopy } from "@/content/copy";
 import { tautanHidup } from "@/content/rute";
 import { BlokCtaPenutup } from "./blok-cta-penutup";
@@ -57,7 +57,10 @@ export function HalamanTentang({ copy }: { copy: TentangCopy }) {
       <SectionHalaman idJudul={idJudulVisiMisi.join(" ")} latar="surface">
         <ul className="grid gap-4 sm:grid-cols-2">
           {copy.visiMisi.map((item, i) => (
-            <li key={item.judul} className="rounded-2xl border border-line bg-bg p-6">
+            <li
+              key={item.judul}
+              className={kelas("muncul-saat-gulir rounded-2xl border border-line bg-bg p-6", kartuInteraktif)}
+            >
               <h2 id={idJudulVisiMisi[i]} className="font-display text-2xl font-extrabold text-ink">
                 {item.judul}
               </h2>

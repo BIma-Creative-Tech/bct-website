@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -104,8 +105,13 @@ export function SiteNav() {
   const halamanIni = (href: string) => (pathname === href ? "page" : undefined);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-bg">
-      <div className={kelas(wadah, "flex h-16 items-center justify-between gap-4")}>
+    // `header-gulir` (app/globals.css): padat di puncak, blur-transparan + bayangan
+    // setelah digulir — CSS scroll-driven, tanpa listener scroll.
+    <header className="header-gulir sticky top-0 z-40 border-b border-line bg-bg">
+      {/* Pita gradien merek di tepi atas setiap halaman (dekoratif). */}
+      <div aria-hidden="true" className="h-1 bg-gradien" />
+      {/* h-20 (bukan h-16) agar logo tulisan tangan tetap terbaca di 56–64 px. */}
+      <div className={kelas(wadah, "flex h-20 items-center justify-between gap-4")}>
         <Link
           href="/"
           aria-label={site.name}
@@ -114,13 +120,18 @@ export function SiteNav() {
             fokusRing,
           )}
         >
-          <span aria-hidden="true" className="mr-2 inline-block h-2 w-2 rounded-full bg-accent" />
-          <span aria-hidden="true" className="md:hidden">
-            {site.shortName}
-          </span>
-          <span aria-hidden="true" className="hidden md:inline">
-            {site.name}
-          </span>
+          {/* Logo resmi BCT (tulisan tangan dalam lingkaran). alt kosong karena nama
+              aksesibel tautan sudah datang dari aria-label={site.name} di atas.
+              Sumber 1720×1598 diperkecil ke public/brand/logo-bct.png (207×192,
+              cukup untuk tampilan 64 px di layar 3×). */}
+          <Image
+            src="/brand/logo-bct.png"
+            alt=""
+            width={207}
+            height={192}
+            loading="eager"
+            className="h-14 w-auto md:h-16"
+          />
         </Link>
 
         {/* Desktop: navigasi horizontal mulai breakpoint md */}

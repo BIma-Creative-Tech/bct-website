@@ -17,7 +17,7 @@ export function DaftarBukti() {
   return (
     <ul className="mt-10 grid gap-8 sm:grid-cols-3">
       {bukti.map((item) => (
-        <li key={item.label} className="border-t border-line pt-5">
+        <li key={item.label} className="muncul-saat-gulir border-t border-line pt-5">
           <p className="font-display text-2xl font-extrabold text-ink">{item.angka}</p>
           <p className="mt-2 font-mono text-xs uppercase tracking-[0.14em] text-muted">
             {item.label}

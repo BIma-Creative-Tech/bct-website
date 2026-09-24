@@ -30,11 +30,11 @@ import { fontKartuOg } from "./fonts";
  * punya dark mode, jadi hanya varian terang yang relevan.
  */
 const warna = {
-  bg: "#f6f5f1", // --bg
+  bg: "#fffbd5", // --bg
   ink: "#191813", // --ink
   ink2: "#54524c", // --ink-2
-  line: "#e3e1d8", // --line
-  accent: "#96660f", // --accent
+  accent: "#b20a2c", // --accent
+  gradien: "linear-gradient(to right, #b20a2c, #fffbd5)", // --gradien
 } as const;
 
 /** Ukuran kartu OG (1200x630 = rasio yang diminta Facebook/X/WhatsApp). */
@@ -123,7 +123,8 @@ export async function kartuOg(meta: MetaCopy): Promise<ImageResponse> {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", width: "100%", height: 1, backgroundColor: warna.line }} />
+          {/* Pita gradien merek, sama dengan pita di header/hero situs. */}
+          <div style={{ display: "flex", width: "100%", height: 6, borderRadius: 3, backgroundImage: warna.gradien }} />
           <div
             style={{
               display: "flex",

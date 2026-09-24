@@ -1,3 +1,4 @@
+import { BlobLatar } from "@/components/blob-latar";
 import { Eyebrow } from "@/components/eyebrow";
 import { LinkButton } from "@/components/link-button";
 import { kelas, wadah } from "@/components/styles";
@@ -22,15 +23,23 @@ export function BlokCtaPenutup({ cta, idJudul }: { cta: BlokCta; idJudul: string
 
   return (
     <section aria-labelledby={idJudul} className={kelas(wadah, "py-16 sm:py-24")}>
-      <div className="rounded-3xl border border-line bg-surface p-8 sm:p-12">
-        <Eyebrow>{cta.eyebrow}</Eyebrow>
-        <h2 id={idJudul} className={kelasJudulSection}>
-          {cta.judul}
-        </h2>
-        <p className={kelasParagrafSection}>{cta.teks}</p>
-        <div className={kelasBarisTombol}>
-          <WaButton pesan={cta.primer.pesan}>{cta.primer.label}</WaButton>
-          {sekunder ? <LinkButton href={sekunder.href}>{sekunder.label}</LinkButton> : null}
+      <div className="muncul-saat-gulir relative isolate overflow-hidden rounded-3xl border border-line bg-surface">
+        {/* Blob aksen berdenyut di latar kartu (pola referensi v0, G-29). */}
+        <BlobLatar posisi="kanan-atas" />
+        {/* Pita gradien di tepi atas kartu — dekoratif, teks tetap di latar surface. */}
+        <div aria-hidden="true" className="h-1.5 bg-gradien" />
+        <div className="p-8 sm:p-12">
+          <Eyebrow>{cta.eyebrow}</Eyebrow>
+          <h2 id={idJudul} className={kelasJudulSection}>
+            {cta.judul}
+          </h2>
+          <p className={kelasParagrafSection}>{cta.teks}</p>
+          <div className={kelasBarisTombol}>
+            <WaButton pesan={cta.primer.pesan} panah>
+              {cta.primer.label}
+            </WaButton>
+            {sekunder ? <LinkButton href={sekunder.href}>{sekunder.label}</LinkButton> : null}
+          </div>
         </div>
       </div>
     </section>

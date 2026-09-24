@@ -1,3 +1,4 @@
+import { kartuInteraktif, kelas, nomorBesar } from "@/components/styles";
 import type { MesinBisnis } from "@/content/copy";
 
 /**
@@ -11,15 +12,25 @@ import type { MesinBisnis } from "@/content/copy";
  * Nomor datang dari copy, bukan dari index array. Semua teks dari content/copy.
  */
 export function DaftarMesin({ item }: { item: MesinBisnis[] }) {
+  // Kartu bergaya proses referensi v0 (G-29), sama dengan <DaftarLangkah>. Latar
+  // `bg` karena /tentang memasang section ini di pita surface.
   return (
-    <ol className="mt-10 grid gap-8 md:grid-cols-3">
+    <ol className="mt-10 grid gap-4 md:grid-cols-3">
       {item.map((mesin) => (
-        <li key={mesin.nomor} className="border-t border-line pt-5">
-          <span className="font-mono text-sm font-semibold tracking-[0.14em] text-accent">
+        <li
+          key={mesin.nomor}
+          className={kelas(
+            "muncul-saat-gulir group relative overflow-hidden rounded-2xl border border-line bg-bg p-6 pt-16",
+            kartuInteraktif,
+          )}
+        >
+          <span aria-hidden="true" className={nomorBesar}>
             {mesin.nomor}
           </span>
-          <h3 className="mt-3 font-display text-lg font-bold text-ink">{mesin.nama}</h3>
-          <p className="mt-2 max-w-[65ch] text-sm text-ink-2">{mesin.teks}</p>
+          <h3 className="relative max-w-[16ch] font-display text-lg font-bold text-ink group-hover:text-accent motion-safe:transition-colors">
+            {mesin.nama}
+          </h3>
+          <p className="relative mt-3 max-w-[65ch] text-sm text-ink-2">{mesin.teks}</p>
         </li>
       ))}
     </ol>

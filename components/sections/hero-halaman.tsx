@@ -1,3 +1,4 @@
+import { BlobLatar } from "@/components/blob-latar";
 import { Eyebrow } from "@/components/eyebrow";
 import { LinkButton } from "@/components/link-button";
 import { kelas, wadah } from "@/components/styles";
@@ -32,20 +33,34 @@ export function HeroHalaman({
   const sekunder = tautanHidup(hero.sekunder);
 
   return (
-    <section aria-labelledby={idJudul} className={kelas(wadah, "py-16 sm:py-24")}>
-      <Eyebrow>{eyebrow ?? hero.eyebrow}</Eyebrow>
-      <h1 id={idJudul} className="mt-6 max-w-[20ch] text-4xl font-extrabold sm:text-5xl lg:text-6xl">
+    // Blob latar + kemunculan bertahap (pola referensi v0, G-29); semua gerak
+    // `motion-safe:`. `relative isolate` agar blob -z-10 tetap di belakang isi.
+    <section aria-labelledby={idJudul} className="relative isolate overflow-hidden">
+      <BlobLatar />
+      <div className={kelas(wadah, "py-16 sm:py-24")}>
+      <Eyebrow className="motion-safe:animate-muncul-naik">{eyebrow ?? hero.eyebrow}</Eyebrow>
+      <h1
+        id={idJudul}
+        className="mt-6 max-w-[20ch] text-4xl font-extrabold sm:text-5xl lg:text-6xl motion-safe:animate-muncul-naik motion-safe:[animation-delay:100ms]"
+      >
         {hero.judul}
       </h1>
-      <p className="mt-6 max-w-[65ch] text-lg text-ink-2">{hero.teks}</p>
+      <p className="mt-6 max-w-[65ch] text-lg text-ink-2 motion-safe:animate-muncul-naik motion-safe:[animation-delay:200ms]">
+        {hero.teks}
+      </p>
       {catatan ? (
-        <p className="mt-8 max-w-[65ch] rounded-xl border border-line bg-accent-soft px-5 py-4 text-sm text-ink-2">
+        <p className="mt-8 max-w-[65ch] rounded-xl border border-line bg-accent-soft px-5 py-4 text-sm text-ink-2 motion-safe:animate-muncul-naik motion-safe:[animation-delay:250ms]">
           {catatan}
         </p>
       ) : null}
-      <div className={kelasBarisTombol}>
-        <WaButton pesan={hero.primer.pesan}>{hero.primer.label}</WaButton>
+      <div className={kelas(kelasBarisTombol, "motion-safe:animate-muncul-naik motion-safe:[animation-delay:300ms]")}>
+        <WaButton pesan={hero.primer.pesan} panah>
+          {hero.primer.label}
+        </WaButton>
         {sekunder ? <LinkButton href={sekunder.href}>{sekunder.label}</LinkButton> : null}
+      </div>
+      {/* Pita gradien penutup hero — dekoratif, bukan latar teks. */}
+      <div aria-hidden="true" className="mt-12 h-1.5 rounded-full bg-gradien sm:mt-16" />
       </div>
     </section>
   );

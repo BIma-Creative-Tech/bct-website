@@ -14,7 +14,7 @@ export const site = {
   // metadataBase dan URL OG image di app/layout.tsx mengikuti nilai ini.
   // WAJIB diganti ke domain produksi sebelum deploy production (checklist W3-04).
   domain: "http://localhost:3000",
-  location: "Depok, Indonesia",
+  location: "",
 } as const;
 
 export function waLink(message: string): string {
@@ -179,6 +179,24 @@ export const bukti = [
   { kunci: "komdigi", angka: "KOMDIGI", label: "webapp perizinan e-Telekomunikasi" },
   { kunci: "retail", angka: "Retail", label: "domain expertise dari pengalaman langsung" },
 ] as const satisfies readonly Bukti[];
+
+/**
+ * Angka ringkas di bawah tombol hero beranda. Sumber: owner, 2026-09-24
+ * ("Project 30+, Client 10+, Pengalaman 10+"). Ubah angkanya HANYA di sini.
+ * `pengalaman` sengaja sama dengan `bukti[kunci="pengalaman"]` (10+ tahun) —
+ * bila salah satunya berubah, ubah keduanya.
+ */
+export type Statistik = {
+  readonly kunci: string;
+  readonly angka: string;
+  readonly label: string;
+};
+
+export const statistik = [
+  { kunci: "proyek", angka: "30+", label: "Total proyek" },
+  { kunci: "klien", angka: "10+", label: "Total klien" },
+  { kunci: "pengalaman", angka: "10+ tahun", label: "Total pengalaman" },
+] as const satisfies readonly Statistik[];
 
 /**
  * Union kunci bukti — DITURUNKAN dari `bukti` di atas, jangan pernah ditulis ulang.

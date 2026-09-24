@@ -28,10 +28,13 @@ npm run lint     # eslint
 Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token didefinisikan di `app/globals.css`:
 
 - Font: **Bricolage Grotesque** (display/heading, weight 700–800), **Figtree** (body), **IBM Plex Mono** (label kecil, eyebrow, angka). Via Google Fonts (`next/font`).
-- Light: bg `#f6f5f1`, surface `#fcfcfb`, ink `#191813`, ink-2 `#54524c`, line `#e3e1d8`, **accent emas `#96660f`**.
-- Dark: bg `#0e0d0b`, surface `#1a1a19`, ink `#f2f0e9`, ink-2 `#c3c2b7`, line `#2c2c2a`, accent `#d9a84e`.
+- Light: bg krem `#fffbd5`, surface `#fffdf0`, ink `#191813`, ink-2 `#54524c`, line `#e8dfae`, **accent merah `#b20a2c`**.
+- Dark: bg `#0e0d0b`, surface `#1a1a19`, ink `#f2f0e9`, ink-2 `#c3c2b7`, line `#2c2c2a`, accent `#f0566f` (merah dicerahkan agar lolos AA di latar gelap).
+- Gradien merek `--gradien` = `linear-gradient(to right, #b20a2c, #fffbd5)` (dark: ujung krem transparan 35%), lewat utilitas `bg-gradien`. **Hanya pita dekoratif ber-`aria-hidden`** (tepi atas header, penutup hero, tepi atas kartu CTA, kartu OG) — tidak pernah latar teks, karena tidak ada warna teks yang lolos AA di sepanjang merah→krem (ADR 2026-09-24).
+- Blok di atas foto (hero beranda) memakai kelas `.tema-gelap` di `app/globals.css` — palet dark yang sama dipasang lokal, jadi tetap gelap di light mode. Jangan menaruh teks di atas foto tanpa kelas ini dan tanpa selubung (`bg-selubung-rata` / `lg:bg-selubung-foto`).
+- Gerak & efek (G-29): pakai yang sudah ada — `motion-safe:animate-muncul-naik` (+ `[animation-delay:…]`), kelas `.muncul-saat-gulir`, `kartuInteraktif` / `chipIkon` / `nomorBesar` di `components/styles.ts`, `<BlobLatar>`, `<JudulSorot>`, `<CahayaKursor>` (client, hanya beranda). Setiap gerak WAJIB di balik `motion-safe:` / `prefers-reduced-motion`. Jangan menambah library animasi.
 - Dark mode wajib jalan (class/system). Eyebrow style: mono uppercase letter-spacing + garis pendek accent di kiri.
-- Nada visual: tenang, presisi, "engineering studio" — bukan agensi marketing yang ramai. Satu aksen emas, sisanya netral.
+- Nada visual: tenang, presisi, "engineering studio" — bukan agensi marketing yang ramai. Satu aksen merah (plus pita gradiennya), sisanya netral.
 
 ## Bahasa & suara
 

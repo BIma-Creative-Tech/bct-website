@@ -46,9 +46,12 @@ export function SiteFooter() {
               {site.name}
             </p>
             <p className="mt-4 max-w-[52ch] text-sm text-ink-2">{footer.ringkas}</p>
-            <p className="mt-4 font-mono text-xs uppercase tracking-[0.14em] text-muted">
-              {site.location}
-            </p>
+            {/* `site.location` boleh dikosongkan owner — jangan render <p> kosong. */}
+            {site.location ? (
+              <p className="mt-4 font-mono text-xs uppercase tracking-[0.14em] text-muted">
+                {site.location}
+              </p>
+            ) : null}
             {/* Label CTA memakai navCta dari content/copy/umum.ts — footer belum
                 punya CTA sendiri di copy. */}
             <WaButton pesan={navCta.pesan} varian="sekunder" className="mt-6">
