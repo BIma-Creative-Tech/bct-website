@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Bricolage_Grotesque, Figtree, IBM_Plex_Mono } from "next/font/google";
 import { IconsaxLoader } from "@/components/iconsax-loader";
+import { ScrollEnhancer } from "@/components/scroll-enhancer";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
 import { SkipLink } from "@/components/skip-link";
@@ -65,6 +66,8 @@ export default async function RootLayout({
         <WaFloatingButton />
         {/* Pulau client kecil: mendaftarkan <iconsax-icon> + subset ikon saat idle (G-37). */}
         <IconsaxLoader />
+        {/* Pulau client kecil: reveal saat digulir + Number Ticker, mulai saat idle (G-38). */}
+        <ScrollEnhancer />
       </body>
     </html>
   );

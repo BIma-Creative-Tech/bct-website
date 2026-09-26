@@ -75,11 +75,17 @@
 }
 
 /* ————————————————————————————————————————————————————————————————
-   Gerak & efek (diadaptasi dari referensi v0 "modern landing page", G-29).
-   Semuanya CSS murni, tanpa dependensi. Keyframes memakai `transform`, sedangkan
-   utilitas hover Tailwind v4 (`-translate-y-*`, `scale-*`, `rotate-*`) memakai
-   properti `translate`/`scale`/`rotate` yang terpisah — jadi animasi masuk yang
-   tertahan (`fill-mode: both`) tidak pernah mengunci efek hover.
+   Gerak & efek — stack referensi platform (ADR 2026-09-26 "Stack UI referensi", G-38/G-39;
+   menggantikan bagian "tanpa library animasi" G-29). Aturan:
+   - HANYA `transform`/`opacity` yang dianimasikan (compositor); semua di balik
+     prefers-reduced-motion (`motion-safe:` / @media) — reduced motion = keadaan akhir statis.
+   - Intro hero: anime.js (adapter WAAPI) di components/hero-animator.tsx, mulai saat idle.
+   - Reveal saat digulir + Number Ticker: components/scroll-enhancer.tsx (IntersectionObserver
+     + spring Motion yang di-import dinamis).
+   - Gerak ambient tanpa akhir (blob, chip melayang, kotak grid) hanya ≥ 768px; mobile statis.
+   Keyframes memakai `transform`, sedangkan utilitas hover Tailwind v4 (`-translate-y-*`,
+   `scale-*`, `rotate-*`) memakai properti `translate`/`scale`/`rotate` yang terpisah — jadi
+   animasi yang tertahan (`fill-mode: both`) tidak pernah mengunci efek hover.
    ———————————————————————————————————————————————————————————————— */
 
 @keyframes melayang {
@@ -88,49 +94,99 @@
 }
 
 @keyframes muncul-naik {
-  from { opacity: 0; transform: translateY(30px); }
+  from { opacity: 0; transform: translateY(24px); }
   to { opacity: 1; transform: none; }
 }
 
-/* Coretan garis bawah kata sorotan: path ber-pathLength=100 digambar dari kiri. */
-@keyframes gambar-garis {
-  from { stroke-dashoffset: 100; }
-  to { stroke-dashoffset: 0; }
+@keyframes denyut {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* 21st.dev / Magic UI Marquee (COMPONENTS.md). */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-100% - var(--gap))); }
+}
+
+/* 21st.dev / Magic UI Animated Grid Pattern (adaptasi, COMPONENTS.md): kotak berkedip. */
+@keyframes grid-square {
+  0% { opacity: 0; }
+  45% { opacity: 1; }
+  55% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes hero-fallback {
+  to { opacity: 1; transform: none; }
 }
 
 @theme {
   --animate-melayang: melayang 7s ease-in-out infinite;
-  --animate-muncul-naik: muncul-naik 0.8s ease-out both;
-  --animate-gambar-garis: gambar-garis 0.9s ease-out 0.6s both;
+  --animate-denyut: denyut 6s ease-in-out infinite;
+  --animate-marquee: marquee var(--duration) infinite linear;
+  /* Durasi di-set inline per kotak. */
+  --animate-grid-square: grid-square 9s ease-in-out 1 both;
 }
 
-/* Muncul saat digulir — scroll-driven animation, tanpa JavaScript. Peningkatan
-   progresif: peramban tanpa `animation-timeline` (dan pengunjung yang meminta
-   pengurangan gerak) langsung melihat elemennya utuh. */
-@media (prefers-reduced-motion: no-preference) {
-  @supports (animation-timeline: view()) {
-    .muncul-saat-gulir {
-      animation: muncul-naik linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 70%;
-    }
+/* Coretan kata sorotan judul hero (components/judul-sorot.tsx): mulai `scaleX(0)` dan
+   "digambar" anime.js (<HeroAnimator>). Fallback CSS menampilkannya penuh setelah 2,5 dtk bila
+   JS gagal; tanpa JS / reduced motion → langsung utuh. */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-hero-init="underline"] {
+    transform: scaleX(0);
+    animation: hero-fallback 0.4s ease-out 2.5s forwards;
   }
+}
+
+/* Reveal (components/reveal.tsx + scroll-enhancer.tsx): hanya elemen yang "armed" oleh JS
+   (masih di bawah viewport saat idle) yang disembunyikan. Memakai CSS ANIMATION, bukan
+   transition seperti web-starter: `transition` di sini (unlayered) akan menimpa transisi
+   hover utilitas Tailwind (`kartuInteraktif`) pada elemen yang sama. */
+[data-reveal-state="armed"] {
+  opacity: 0;
+}
+[data-reveal-state="in"] {
+  animation: muncul-naik 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0s) both;
 }
 
 /* Header: padat di puncak halaman, lalu transparan-blur + bayangan setelah digulir
-   ±120 px (scroll-driven, tanpa listener JS). Tanpa dukungan: tetap padat. */
-@keyframes header-tergulir {
-  to {
-    background-color: color-mix(in srgb, var(--bg) 78%, transparent);
-    backdrop-filter: blur(12px);
-    box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.45);
-  }
+   ±120 px (scroll-driven, tanpa listener JS). Compositor-only: yang dianimasikan hanya
+   OPACITY dua lapisan pseudo (padat → kaca), bukan background/backdrop-filter/box-shadow.
+   Tanpa dukungan scroll-timeline: header tetap padat (`bg-bg`). */
+@keyframes pudar-keluar {
+  to { opacity: 0; }
+}
+@keyframes pudar-masuk {
+  to { opacity: 1; }
 }
 @supports (animation-timeline: scroll()) {
   .header-gulir {
-    animation: header-tergulir linear both;
+    isolation: isolate;
+    background-color: transparent;
+  }
+  .header-gulir::before,
+  .header-gulir::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
     animation-timeline: scroll(root);
     animation-range: 0 120px;
+    animation-fill-mode: both;
+    animation-timing-function: linear;
+  }
+  .header-gulir::before {
+    background-color: var(--bg);
+    animation-name: pudar-keluar;
+  }
+  .header-gulir::after {
+    opacity: 0;
+    background-color: color-mix(in srgb, var(--bg) 78%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.45);
+    animation-name: pudar-masuk;
   }
 }
 
