@@ -251,7 +251,7 @@ export default function Home() {
                   latar={<div className={kelas("absolute inset-0", LATAR_BENTO[i % LATAR_BENTO.length])} />}
                   panah={
                     <Icon
-                      name="arrow-right-02"
+                      name="arrow-right-01"
                       size={20}
                       className="mt-1 text-muted group-hover:text-accent motion-safe:transition motion-safe:group-hover:translate-x-1"
                     />

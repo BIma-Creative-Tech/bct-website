@@ -25,7 +25,7 @@ export function LinkButton({
     >
       {children}
       {panah ? (
-        <Icon name="arrow-right-02" size={16} className={panahTombol} />
+        <Icon name="arrow-right-01" size={16} className={panahTombol} />
       ) : null}
     </Link>
   );

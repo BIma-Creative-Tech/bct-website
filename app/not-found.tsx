@@ -137,7 +137,7 @@ export default function TidakDitemukan() {
                 <h3 className="flex items-start justify-between gap-3 font-display text-lg font-bold text-ink">
                   {item.nama}
                   <Icon
-                    name="arrow-right-02"
+                    name="arrow-right-01"
                     size={20}
                     className="mt-1 text-muted group-hover:text-accent motion-safe:transition-colors"
                   />

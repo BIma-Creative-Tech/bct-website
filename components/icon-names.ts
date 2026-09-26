@@ -20,9 +20,9 @@ export const ICON_NAMES = [
   "tick-circle",
   "minus",
   // Navigasi & tombol
-  "arrow-right-02",
-  "arrow-down-01",
-  "menu",
+  "arrow-right-01",
+  "arrow-down-02",
+  "textalign-justifycenter",
   "close-circle",
   "messages-2",
   "pause",

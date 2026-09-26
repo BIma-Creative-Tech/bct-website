@@ -149,7 +149,7 @@ export function SiteNav() {
               >
                 {pemicuProduk.label}
                 <Icon
-                  name="arrow-down-01"
+                  name="arrow-down-02"
                   size={14}
                   className={kelas(produkTerbuka && "rotate-180", "motion-safe:transition-transform")}
                 />
@@ -215,7 +215,7 @@ export function SiteNav() {
         >
           {/* `key` memasang ulang elemen saat ikon berganti: IconsaxLoader hanya
               mengaktifkan <iconsax-icon> BARU (atribut `name` tidak dikelola React). */}
-          <Icon key={menuTerbuka ? "tutup" : "buka"} name={menuTerbuka ? "close-circle" : "menu"} size={22} />
+          <Icon key={menuTerbuka ? "tutup" : "buka"} name={menuTerbuka ? "close-circle" : "textalign-justifycenter"} size={22} />
           <span className="sr-only">{menuTerbuka ? A11Y.tutupMenu : A11Y.bukaMenu}</span>
         </button>
       </div>

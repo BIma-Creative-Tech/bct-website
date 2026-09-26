@@ -124,9 +124,14 @@
 @theme {
   --animate-melayang: melayang 7s ease-in-out infinite;
   --animate-denyut: denyut 6s ease-in-out infinite;
-  --animate-marquee: marquee var(--duration) infinite linear;
   /* Durasi di-set inline per kotak. */
   --animate-grid-square: grid-square 9s ease-in-out 1 both;
+}
+
+/* `inline`: nilai var(--duration) harus diselesaikan di ELEMEN marquee (prop `durasi`), bukan di
+   :root — tanpa `inline` animasinya invalid (terbukti: animation-name none). Sama dengan web-starter. */
+@theme inline {
+  --animate-marquee: marquee var(--duration) infinite linear;
 }
 
 /* Coretan kata sorotan judul hero (components/judul-sorot.tsx): mulai `scaleX(0)` dan

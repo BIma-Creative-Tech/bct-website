@@ -38,13 +38,17 @@ export function HeroAnimator({ children, className }: { children: ReactNode; cla
             // anime.js mengambil alih coretan → matikan fallback CSS-nya.
             const coretan = el.querySelectorAll<HTMLElement>('[data-hero-init="underline"]');
             coretan.forEach((u) => (u.style.animation = "none"));
-            waapi.animate(coretan, {
-              transform: ["scaleX(0)", "scaleX(1)"],
-              duration: 1100,
-              delay: 250,
-              ease: "outExpo",
-              persist: true,
-            });
+            // Tanpa target anime.js menulis peringatan konsol → hanya animasikan yang ada.
+            if (coretan.length) {
+              waapi.animate(coretan, {
+                transform: ["scaleX(0)", "scaleX(1)"],
+                duration: 1100,
+                delay: 250,
+                ease: "outExpo",
+                persist: true,
+              });
+            }
+            if (!el.querySelector('[data-hero-init="lift"]')) return;
             waapi.animate('[data-hero-init="lift"]', {
               transform: ["translateY(0px)", "translateY(-6px)", "translateY(0px)"],
               duration: 800,
