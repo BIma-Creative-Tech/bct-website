@@ -13,24 +13,56 @@ Website resmi PT Bima Creative Tech (BCT) — company profile, katalog produk, d
 
 ## Menjalankan
 
+Node **24** (`engines` `>=24 <25`), semua dependency di-pin versi persis. Host VPS tidak punya Node — pakai container (repo di-mount), seperti referensi platform `/opt/src/web-starter`:
+
 ```bash
-npm install
-npm run dev   # http://localhost:3000
+docker run --rm -v "$PWD:/app" -w /app node:24.21.0-bookworm-slim sh -c \
+  'npm ci && npm run lint && npm run typecheck && npm test && npm run build'
+# dev server
+docker run --rm -it -v "$PWD:/app" -w /app -p 127.0.0.1:3000:3000 -e SITE_URL=http://localhost:3000 \
+  node:24.21.0-bookworm-slim npm run dev -- -H 0.0.0.0
 ```
 
-## Deploy
+Aktifkan hook gitleaks sekali per clone: `git config core.hooksPath .githooks` (butuh Docker).
 
-Vercel (production branch: `main`). Env yang dibutuhkan (keterangan lengkap di `.env.example`):
+## Deploy (VPS di belakang Traefik — ADR 2026-09-26)
 
-- `NEXT_PUBLIC_UMAMI_SRC`, `NEXT_PUBLIC_UMAMI_ID` — opsional sampai Umami terpasang.
-- `LEAD_WEBHOOK_URL` — **wajib** agar form kontak berfungsi. Selama kosong, `/api/lead` sengaja membalas `503` dan form menampilkan error alih-alih sukses palsu. Wajib `https://` dan menunjuk tujuan milik BCT: nama, nomor WA/email, dan isi pesan pengunjung melintas ke sana.
+Situs self-host di VPS platform, **bukan Vercel**. Alurnya:
 
-Tiga syarat keamanan dari audit 2026-08-25 dan 2026-08-26 (dilacak sebagai G-12, W3-04, G-16, dan G-20 di `docs/checklist.md`) — semuanya wajib, bukan saran:
+1. CI (`.github/workflows/ci.yml`) membangun image, memindainya (Trivy HIGH/CRITICAL), menjalankan smoke test kontrak, lalu push ke **`ghcr.io/bctech-adm/bct-website`** — `:sha-<12>` untuk `main`, `:X.Y.Z` untuk tag `vX.Y.Z` (harus sama dengan `package.json` dan tercatat di CHANGELOG). Tidak ada tag `latest`.
+2. Repo infra memprovisikan container + router Traefik:
+   ```bash
+   /opt/infra/scripts/provision-web-client.sh bct staging --host bct.staging.bimacreative.tech \
+     --image ghcr.io/bctech-adm/bct-website:<X.Y.Z>        # usulan host staging
+   /opt/infra/scripts/provision-web-client.sh bct prod --host <domain final> --image ghcr.io/bctech-adm/bct-website:<X.Y.Z> [--www]
+   ```
+   Skrip merender `templates/web-client/docker-compose.yml` (network `web-edge`, tanpa port publik, read-only + tmpfs, uid 1001, `cap_drop: ALL`, limit 256 MB/0,5 CPU/128 pids) dan router Traefik (`crowdsec` → `security-headers` → rate limit; TLS Let's Encrypt). Runbook: `infra/docs/runbooks/web-client-onboarding.md`. Deploy production = gerbang konfirmasi owner (W3-04).
+3. `docker-compose.yml` di repo ini **hanya untuk uji lokal** (hardening yang sama, port hanya `127.0.0.1:3000`).
 
-- **Jangan pernah set `VERCEL=1` secara manual** di luar platform Vercel. Flag itu membuat `/api/lead` memercayai header `x-vercel-forwarded-for`; auditor membuktikan 2.000 request berheader palsu lolos 100% saat flag itu aktif di luar edge Vercel. Di Vercel asli edge menimpa header tersebut sehingga aman.
-- **Deploy sebaiknya di belakang edge Vercel**, bukan image standalone yang origin-nya diekspos langsung. Pada mode self-host (`docker-compose.yml` memetakan `3000:3000` tanpa reverse proxy) seluruh trafik berbagi satu ember rate limit 30/menit per instans — ~30 request semenit dari satu sumber mengunci form untuk semua pengunjung lain. Perbaikan sesungguhnya butuh penyimpanan rate limit bersama, menunggu keputusan owner di G-16.
-- **Di belakang reverse proxy, `Host` asli WAJIB diteruskan** — `proxy_set_header Host $host;` di nginx, atau padanannya di Caddy/Traefik. Sejak perbaikan keamanan G-20 membuang `X-Forwarded-Host` (header itu ditulis klien dan terbukti bisa dipakai menambahkan origin ke daftar putih), `/api/lead` hanya mengenali situsnya dari header `Host`. Dengan `proxy_pass` bawaan nginx, `Host` justru menjadi alamat upstream dan host publik hanya tersisa di `X-Forwarded-Host` yang kini sengaja diabaikan. Akibatnya bukan pelemahan melainkan **form kontak mati untuk semua pengunjung** — setiap kiriman dibalas 403. Terukur auditor: `Host: 127.0.0.1:3000` + `X-Forwarded-Host: bct.co.id` + `Origin: https://bct.co.id` → **403**; dan `Host: bct.co.id:443` + `Origin: https://bct.co.id` → **403** juga, karena port ikut dibandingkan apa adanya — jadi jangan teruskan `Host` berikut port default. Vercel tidak terpengaruh (edge-nya mengisi `Host` dengan host publik); yang terpengaruh adalah image GHCR + `docker-compose.yml` di belakang reverse proxy.
+### Kontrak container
 
-Sebelum deploy production: ganti `site.domain` di `content/site.ts` dari `http://localhost:3000` ke domain final — `sitemap.xml`, `robots.txt`, canonical, `og:url`, dan URL kartu OG semuanya mengikuti nilai itu (terukur W3-01: satu perubahan memperbaiki ketujuh `<loc>`, baris `Sitemap:` di robots, dan 30 URL absolut (14 nilai unik) di `<head>` kedelapan rute, menyisakan nol `localhost:3000`).
+| Item | Nilai |
+|---|---|
+| Port | 3000 (`HOSTNAME=0.0.0.0`) — hanya dijangkau Traefik, TIDAK boleh diterbitkan publik |
+| Health | `GET /api/health` → 200 `{"status":"ok"}` (HEALTHCHECK image & compose) |
+| User | uid:gid 1001:1001 |
+| Filesystem | rootfs read-only; writable hanya `/tmp` dan `/app/.next/cache` (tmpfs; cache optimasi `next/image`) |
+| Header | CSP ber-nonce dikirim aplikasi (`proxy.ts`) — Traefik tidak menyetel CSP. HSTS/nosniff/frame/referrer/permissions dari middleware `security-headers` Traefik; aplikasi juga mengirim nosniff/frame/referrer/permissions/COOP (bukan HSTS) |
+| Host & IP | Traefik meneruskan `Host` asli (dipakai pagar Origin `/api/lead`) dan menulis ulang `X-Forwarded-For`/`X-Real-Ip` dari alamat soket (dipakai rate limit) |
+
+### Env
+
+| Env | Wajib | Keterangan |
+|---|---|---|
+| `SITE_URL` | ya | URL publik kanonik tanpa slash akhir. Sumber metadataBase, canonical, `og:url`, kartu OG, `sitemap.xml`, `robots.txt`. Dicek saat boot — kosong/tidak sah → container exit 1. Host berlabel `staging` atau localhost → `<meta name="robots" content="noindex, nofollow">` + robots `Disallow: /` |
+| `LEAD_WEBHOOK_URL` | agar form berfungsi | Kosong → `/api/lead` sengaja membalas **503** dan form menampilkan error jujur (ADR 2026-08-25). Wajib `https://` dan tujuan milik BCT (data pribadi pengunjung melintas ke sana). **Catatan:** template compose infra saat ini hanya meneruskan `SITE_URL` + `CONTACT_ENABLED` — `LEAD_WEBHOOK_URL` belum ikut diteruskan (keputusan owner/infra, lihat G-12) |
+| `NEXT_PUBLIC_UMAMI_SRC`, `NEXT_PUBLIC_UMAMI_ID` | tidak | Dibaca saat **build**. Origin https dari `SRC` otomatis diizinkan CSP; skrip wajib lewat `next/script` (nonce) |
+
+Keterangan lengkap di `.env.example`. Tidak ada secret di `NEXT_PUBLIC_*` (boot gagal bila namanya mirip secret).
+
+### Syarat keamanan yang masih berlaku
+
+- **Rate limit `/api/lead` memercayai entri `X-Forwarded-For` paling kanan** karena Traefik (entrypoint tanpa `trustedIPs`) membuang header kiriman klien dan menuliskan alamat soket sendiri. Karena itu container **tidak boleh** diberi port publik tanpa Traefik di depannya — tanpa hop tepercaya penyerang bisa memilih ember rate limit-nya sendiri (terbukti audit G-05). Jalur lama `VERCEL=1` sudah dibuang. Batasnya per container; replika > 1 butuh penyimpanan bersama (G-16).
+- **`Host` asli wajib diteruskan** ke container (Traefik `passHostHeader` bawaan = ya). `/api/lead` hanya mengenali situsnya dari `Host` (`X-Forwarded-Host` sengaja diabaikan sejak G-20); `Host` yang salah (alamat upstream, atau membawa port default `:443`) membuat **form mati untuk semua pengunjung** (403).
 
 © PT Bima Creative Tech. Seluruh hak cipta — bukan open source.

@@ -9,7 +9,7 @@ Kamu Security Auditor BCT. Kamu TIDAK mengubah kode — kamu memeriksa, membukti
 ## Checklist audit (jalankan yang relevan dengan diff)
 
 1. **Secrets**: `git diff` & tree bebas kredensial/token/API key; `.env*` tidak ter-commit; jalankan `npx gitleaks detect --no-banner` bila tersedia.
-2. **Headers**: CSP, HSTS, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, X-Frame-Options tetap terpasang di `next.config.ts` dan tidak dilonggarkan tanpa alasan tertulis.
+2. **Headers**: CSP, HSTS, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, X-Frame-Options tetap terpasang — CSP ber-nonce di `proxy.ts`/`lib/csp.ts`, HSTS di Traefik, sisanya di `next.config.ts` — dan tidak dilonggarkan tanpa alasan tertulis.
 3. **Input**: semua API route memvalidasi body (zod), menolak method selain yang diizinkan, punya rate limit & honeypot untuk form publik, tidak mem-forward input mentah ke mana pun.
 4. **Dependency**: `npm audit --omit=dev` — temuan high/critical = blocker; dependency baru harus punya justifikasi di PR.
 5. **Docker**: image non-root, tidak ada secret di layer, base image ter-pin, HEALTHCHECK ada.

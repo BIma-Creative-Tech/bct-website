@@ -12,16 +12,24 @@ Website company profile + aset jualan BCT. **Tujuan tunggal halaman apa pun: men
 
 - Next.js (App Router) + TypeScript strict + Tailwind CSS v4 (`@tailwindcss/postcss`).
 - Konten = file TS/MDX di `content/` — TIDAK ada CMS. Copy per halaman di `content/copy/` (bertipe, diimpor lewat `@/content/copy`). Data produk & harga di `content/site.ts` adalah **satu-satunya sumber kebenaran** untuk nama paket, harga, dan CTA; komponen tidak boleh hardcode angka harga.
-- Deploy: Vercel. Analytics: Umami (script di layout, env `NEXT_PUBLIC_UMAMI_*`; jangan pakai Google Analytics).
+- Runtime: **Node 24** (`engines` `>=24 <25`), semua dependency di-pin versi persis (tanpa `^`/`~`, `.npmrc` `save-exact`). Referensi platform: `/opt/src/web-starter` (ADR 2026-09-26).
+- Deploy: **self-host di VPS di belakang Traefik** (BUKAN Vercel) — image `ghcr.io/bctech-adm/bct-website`, diprovisikan repo infra lewat `/opt/infra/scripts/provision-web-client.sh`. Kontrak container: port 3000, `GET /api/health`, uid 1001, rootfs read-only, env `SITE_URL` wajib (URL kanonik; host `staging`/localhost → noindex). CSP ber-nonce per request di `proxy.ts` (Traefik tidak menyetel CSP), HSTS di Traefik. Detail: README §Deploy.
+- Analytics: Umami (env `NEXT_PUBLIC_UMAMI_*`, origin-nya sudah diizinkan CSP; skrip wajib lewat `next/script` agar menerima nonce; jangan pakai Google Analytics).
 - Tidak ada komponen library berat (shadcn boleh dipetik per-komponen bila perlu). Tidak ada state management library.
 
 ### Commands
 
+Host VPS **tidak punya Node** — jalankan lewat container (repo di-mount), seperti web-starter:
+
 ```bash
-npm run dev      # dev server
-npm run build    # production build — harus lulus sebelum commit
-npm run lint     # eslint
+docker run --rm -v "$PWD:/app" -w /app node:24.21.0-bookworm-slim sh -c \
+  'npm ci && npm run lint && npm run typecheck && npm test && npm run build'
+# dev server (SITE_URL wajib)
+docker run --rm -it -v "$PWD:/app" -w /app -p 127.0.0.1:3000:3000 -e SITE_URL=http://localhost:3000 \
+  node:24.21.0-bookworm-slim npm run dev -- -H 0.0.0.0
 ```
+
+`npm run lint` (eslint, 0 warning) · `npm run typecheck` (next typegen + tsc) · `npm test` (vitest, `tests/unit/`) · `npm run build` — semuanya harus lulus sebelum commit. Guard: `node scripts/check-pii.mjs` (setelah build), `node scripts/check-csp.mjs <url> <path…>` (terhadap server hidup). Hook gitleaks: `git config core.hooksPath .githooks` sekali per clone.
 
 ## Design system (WAJIB diikuti, jangan improvisasi warna/font baru)
 
@@ -59,13 +67,13 @@ Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token dide
 
 **Rute hidup dibaca dari `content/rute.ts`** (`RUTE_HIDUP` + `ruteHidup()`/`saringTautan()`/`tautanHidup()`) — satu-satunya sumber; nav, footer, CTA, `app/not-found.tsx`, dan `app/sitemap.ts` semuanya memakainya, jadi menghidupkan `/studi-kasus` atau `/insight` cukup satu baris di berkas itu. Jangan membuat daftar rute kedua. Batas yang perlu diketahui: aturan ini belum dipaksakan mesin (G-23) — tautan literal ke rute mati masih lolos lint/tsc/build.
 
-**Aset SEO sudah ada (W3-01), jangan dibuat ulang:** `app/sitemap.ts` → `/sitemap.xml` (7 `<loc>` dari `RUTE_HIDUP`), `app/robots.ts` → `/robots.txt`, `app/icon.tsx` → favicon, dan tujuh `opengraph-image.tsx` (root + `/pricing` + `/tentang` + `/kontak` + 3 `/produk/*`) → kartu OG 1200×630 lewat `components/og/`. Fontnya di `assets/fonts/`, bukan `public/`. Semua URL absolut masih menunjuk `http://localhost:3000` sampai domain diisi di W3-04. `/favicon.ico` sendiri tetap 404 (Next melarang favicon dirender kode) — keputusan menunggu owner di W3-01.
+**Aset SEO sudah ada (W3-01), jangan dibuat ulang:** `app/sitemap.ts` → `/sitemap.xml` (7 `<loc>` dari `RUTE_HIDUP`), `app/robots.ts` → `/robots.txt`, `app/icon.tsx` → favicon, dan tujuh `opengraph-image.tsx` (root + `/pricing` + `/tentang` + `/kontak` + 3 `/produk/*`) → kartu OG 1200×630 lewat `components/og/`. Fontnya di `assets/fonts/`, bukan `public/`. Semua URL absolut (metadataBase, canonical, og:url, kartu OG, sitemap, robots) mengikuti env `SITE_URL` saat request (`lib/site.ts`) — tidak ada domain hard-coded. `/favicon.ico` sendiri tetap 404 (Next melarang favicon dirender kode) — keputusan menunggu owner di W3-01.
 
 ## Backlog sprint (kerjakan berurutan)
 
 - **W1 — Struktur & copy:** finalisasi copywriting semua halaman di `content/`, layout + nav + footer, halaman beranda utuh.
 - **W2 — Semua halaman:** produk ×3, pricing, studi kasus, tentang, kontak (form → `/api/lead` → webhook + link WA; **bukan** `mailto:` — ADR 2026-08-24 melarang alamat email terbit ke HTML), insight (MDX list + detail).
-- **W3 — Poles & rilis:** SEO (metadata per halaman, sitemap.xml, robots, OG image), Umami, aksesibilitas, uji mobile, deploy Vercel + domain.
+- **W3 — Poles & rilis:** SEO (metadata per halaman, sitemap.xml, robots, OG image), Umami, aksesibilitas, uji mobile, deploy VPS (Traefik) + domain.
 
 **Definition of Done situs:** live di domain sendiri · semua halaman konten nyata · form & tombol WA teruji · Lighthouse mobile ≥ 90 semua kategori · rate card PDF bisa diunduh · analytics mencatat.
 
@@ -95,8 +103,8 @@ Tugas multi-langkah apa pun dimulai dari agent **`lead`** (`.claude/agents/lead.
 
 - **Papan status: `docs/checklist.md`.** Alur: ⬜ → 🔨 → 🧪 → 🟨 KONFIRMASI-OWNER → ✅. **Hanya owner (Ade) yang menjadikan ✅** — agent berhenti di 🟨 dengan bukti satu baris. Owner mengonfirmasi dengan "konfirmasi <ID>".
 - **Setiap perubahan kode** wajib memperbarui `CHANGELOG.md` ([Unreleased], format Keep a Changelog) dan `docs/checklist.md` di commit yang sama — CI merah bila tidak (`scripts/check-governance.mjs`).
-- **Commit**: Conventional Commits (feat/fix/chore/docs/ci/sec). **Rilis**: SemVer; tag `v*` → CI build image ke `ghcr.io/sarangrumah/bct-website`; tag hanya setelah owner konfirmasi.
-- **Keamanan**: baca `SECURITY.md`; header di `next.config.ts` dan pola `/api/lead` (zod + honeypot + rate limit) adalah baseline — jangan diturunkan.
+- **Commit**: Conventional Commits (feat/fix/chore/docs/ci/sec). **Rilis**: SemVer; tag `vX.Y.Z` (= `package.json` + heading CHANGELOG) → CI build + scan + smoke test → push `ghcr.io/bctech-adm/bct-website:X.Y.Z` (main → `:sha-<12>`); tag hanya setelah owner konfirmasi.
+- **Keamanan**: baca `SECURITY.md`; CSP ber-nonce di `proxy.ts`/`lib/csp.ts`, header statis di `next.config.ts`, dan pola `/api/lead` (zod + honeypot + rate limit) adalah baseline — jangan diturunkan.
 - **Keputusan penting** dicatat di `docs/decisions.md` (ADR mini) pada sesi yang sama.
 - Gerbang konfirmasi owner: deploy production, perubahan harga/pricing, dependency baru, perubahan CI/Docker, dan hal yang menyentuh data pribadi.
 
