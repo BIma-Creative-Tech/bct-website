@@ -21,7 +21,7 @@ import { SectionHalaman } from "./section-halaman";
  *
  * Alasan yang sama berlaku untuk `tombolWa` di bawah: <WaButton> dirender DI SINI,
  * lalu elemen hasilnya yang menyeberang. Kalau <FormKontak> yang mengimpornya,
- * `content/site.ts` ikut UTUH ke bundel klien — `email`, `domain`, `location`,
+ * `content/site.ts` ikut UTUH ke bundel klien — `email`, `location`,
  * `tagline` — di chunk bersama yang dimuat setiap rute, bukan cuma /kontak.
  * Aturannya lengkap di aturan 7 pada kepala components/sections/form-kontak.tsx.
  *

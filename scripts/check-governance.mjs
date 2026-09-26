@@ -1,6 +1,7 @@
 /**
  * Governance check (dijalankan CI):
- * Jika ada perubahan kode (app/, components/, content/, config, Dockerfile, workflows)
+ * Jika ada perubahan kode (app/, components/, content/, lib/, scripts/, tests/, config,
+ * proxy.ts, instrumentation.ts, Dockerfile, workflows, hook git)
  * maka CHANGELOG.md dan docs/checklist.md juga harus berubah di push/PR yang sama.
  * Tujuan: dokumentasi & checklist termonitor di SETIAP perubahan.
  */
@@ -23,8 +24,8 @@ try {
 }
 
 const codeTouched = files.some((f) =>
-  /^(app|components|content)\//.test(f) ||
-  /^(Dockerfile|docker-compose\.yml|next\.config\.ts|package\.json)$/.test(f) ||
+  /^(app|components|content|lib|scripts|tests|\.githooks)\//.test(f) ||
+  /^(Dockerfile|\.dockerignore|docker-compose\.yml|next\.config\.ts|proxy\.ts|instrumentation\.ts|vitest\.config\.m?ts|package\.json|package-lock\.json|\.npmrc)$/.test(f) ||
   /^\.github\/workflows\//.test(f)
 );
 

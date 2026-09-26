@@ -1,6 +1,9 @@
 import type { MetadataRoute } from "next";
 import { RUTE_HIDUP } from "@/content/rute";
-import { site } from "@/content/site";
+import { urlKanonik } from "@/lib/site";
+
+// SITE_URL dibaca saat request (bukan saat build) → satu image untuk semua host.
+export const dynamic = "force-dynamic";
 
 /**
  * /sitemap.xml
@@ -25,22 +28,10 @@ import { site } from "@/content/site";
  *   pencari besar mengabaikannya. Menambahkannya = tabel angka karangan yang
  *   harus dirawat setiap kali halaman bertambah.
  *
- * Domain diambil dari `site.domain`. Selama nilainya masih "http://localhost:3000"
- * (sementara, sampai W3-04 mengisi domain produksi) sitemap ini memuat URL
- * localhost — itu memang keadaan sebenarnya, bukan yang boleh ditambal di sini.
+ * Domain diambil dari env `SITE_URL` (lib/site.ts) saat request — sumber yang sama
+ * dengan metadataBase, canonical, dan og:url (ADR 2026-09-26).
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   return RUTE_HIDUP.map((path) => ({ url: urlKanonik(path) }));
 }
 
-/**
- * Bentuk URL absolut yang PERSIS SAMA dengan <link rel="canonical"> terbitan Next
- * untuk rute yang sama. Next menerbitkan beranda tanpa garis miring penutup
- * ("http://localhost:3000"), sedangkan `new URL("/", ...)` menghasilkan versi
- * bergaris miring; membiarkan keduanya berbeda berarti sitemap dan canonical
- * menunjuk dua URL yang tidak identik untuk halaman yang sama.
- */
-function urlKanonik(path: string): string {
-  const url = new URL(path, site.domain);
-  return url.pathname === "/" ? url.href.replace(/\/+$/, "") : url.href;
-}

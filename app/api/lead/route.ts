@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { clientIpFrom } from "@/lib/client-ip";
 import { BATAS_ISIAN } from "./batas";
 
 /**
@@ -83,9 +84,11 @@ const TIPE_ISI_WAJIB = "application/json";
  * membuktikan lewat soket mentah bahwa `Host: <asli>` + `X-Forwarded-Host: evil.com`
  * + `Origin: evil.com` dibalas 200 — header itu ditulis KLIEN dan tidak ada satu pun
  * hop tepercaya yang menimpanya di jalur deploy proyek ini, jadi memakainya sama
- * dengan mengizinkan penyerang menambahkan origin ke daftar putih. Ini doktrin yang
- * sama dengan `identitasKlien`: header hop hanya berarti bila ada proxy tepercaya
- * yang dikonfigurasi, dan proyek ini belum punya konfigurasi itu.
+ * dengan mengizinkan penyerang menambahkan origin ke daftar putih. Di deploy VPS
+ * (ADR 2026-09-26) Traefik meneruskan `Host` asli (passHostHeader bawaan) dan mengisi
+ * `X-Forwarded-Host` dengan nilai yang sama, jadi header itu tidak menambah apa pun —
+ * `Host` saja tetap cukup, dan route ini tidak bergantung pada perilaku penulisan ulang
+ * header yang tidak bisa diuji tanpa Traefik.
  *
  * `Host` DIPERTAHANKAN — sengaja, dan bukan karena ia lebih aman:
  * - Untuk serangan yang jadi alasan pagar ini (skrip di situs lain memakai peramban
@@ -188,14 +191,14 @@ function asalAsing(req: NextRequest): boolean {
 // ————————————————————————————————————————————————————————————————
 // Rate limit — dan batas perlindungannya (dibaca apa adanya, bukan jaminan)
 // ————————————————————————————————————————————————————————————————
-// 1. Penyimpanannya in-memory per instance. Di Vercel setiap instance/region
-//    punya Map sendiri, jadi angka di bawah adalah batas PER INSTANCE, bukan
-//    batas global situs. Perbaikan sebenarnya = penyimpanan bersama (KV/Redis).
+// 1. Penyimpanannya in-memory per instance. Deploy VPS = satu container per situs
+//    (ADR 2026-09-26), jadi angka di bawah = batas situs selama replika tetap 1;
+//    bila di-scale >1 replika, perbaikan sebenarnya = penyimpanan bersama (G-16).
 // 2. Kuncinya alamat IP. Satu kantor di belakang NAT berbagi satu ember, dan
 //    satu pelanggan IPv6 bisa berganti alamat sesukanya di dalam /64 — karena
 //    itu IPv6 dikelompokkan per /64, bukan per alamat.
-// 3. Kalau tidak ada hop tepercaya di depan, TIDAK ADA identitas yang bisa
-//    dipercaya sama sekali (lihat identitasKlien). Yang tersisa hanya pagar
+// 3. Identitas hanya bisa dipercaya karena Traefik adalah hop tepercaya di depan
+//    container (lihat lib/client-ip.ts). Permintaan tanpa IP sah masuk pagar
 //    global: itu memperlambat banjir, bukan mencegah spam bertarget.
 const JENDELA_MS = 60_000;
 const MAKS_PER_IP = 5; // per IP tepercaya, per jendela
@@ -212,18 +215,6 @@ function bersihkanKedaluwarsa(sekarang: number): void {
   for (const [kunci, entri] of hits) {
     if (sekarang > entri.reset) hits.delete(kunci);
   }
-}
-
-/**
- * Ambil elemen PALING KANAN dari header berisi daftar hop.
- * Elemen paling kiri ditulis klien dan bisa dikarang bebas — memakainya berarti
- * membiarkan penyerang memilih ember rate limitnya sendiri.
- */
-function hopTerdekat(nilai: string | null): string | null {
-  if (!nilai) return null;
-  const bagian = nilai.split(",");
-  const terakhir = bagian[bagian.length - 1]?.trim();
-  return terakhir ? terakhir : null;
 }
 
 function normalisasiIp(mentah: string | null): string | null {
@@ -254,33 +245,20 @@ function normalisasiIp(mentah: string | null): string | null {
 /**
  * Identitas untuk rate limit.
  *
- * X-Forwarded-For, X-Real-IP, dan X-Vercel-Forwarded-For semuanya bisa DITULIS
- * KLIEN. Header itu baru berarti kalau ada proxy tepercaya yang menimpanya
- * sebelum permintaan sampai ke sini. Satu-satunya sinyal yang bisa dipastikan
- * tanpa konfigurasi baru: `VERCEL=1` diset platform Vercel (target deploy per
- * CLAUDE.md), dan di sana edge menimpa header tersebut dengan IP asli.
+ * GANTI DOKTRIN 2026-09-26 (ADR "Deploy VPS di belakang Traefik"): jalur kepercayaan
+ * `VERCEL === "1"` + `x-vercel-forwarded-for` DIBUANG — situs tidak lagi di Vercel, dan
+ * flag itu berbahaya bila diset manual (G-12). Penggantinya `clientIpFrom()`
+ * (lib/client-ip.ts, pola web-starter): entri `X-Forwarded-For` PALING KANAN, yang
+ * ditulis ulang Traefik dari alamat soket peer (entrypoint tanpa `trustedIPs` → header
+ * kiriman klien dibuang), fallback `X-Real-Ip`. Syaratnya kontrak deploy: container
+ * tanpa port publik, hanya dijangkau lewat Traefik.
  *
- * Di luar Vercel (mis. docker-compose yang membuka 3000:3000 langsung) tidak ada
- * hop tepercaya, jadi header sengaja TIDAK dipakai sama sekali: memakainya sama
- * dengan menyerahkan kunci ember kepada penyerang. Sebagai gantinya semua
- * permintaan tanpa identitas masuk ke satu ember global dengan jatah jauh lebih
- * besar (MAKS_TANPA_IDENTITAS), supaya identitas yang tidak diketahui tidak
- * mengunci form untuk semua pengunjung seperti jatah 5/menit sebelumnya.
- *
- * Kalau nanti situs berdiri di belakang proxy sendiri (nginx/Caddy/Cloudflare),
- * jumlah hop tepercaya harus dikonfigurasi eksplisit lewat env yang
- * terdokumentasi — itu keputusan owner, bukan tebakan route ini.
+ * Tanpa IP sah (header tidak ada / bukan IP) → satu ember global dengan jatah jauh
+ * lebih besar (MAKS_TANPA_IDENTITAS), supaya identitas yang tidak diketahui tidak
+ * mengunci form untuk semua pengunjung.
  */
 function identitasKlien(req: NextRequest): Identitas {
-  if (process.env.VERCEL !== "1") {
-    return { kunci: KUNCI_TANPA_IDENTITAS, maks: MAKS_TANPA_IDENTITAS };
-  }
-
-  const ip =
-    normalisasiIp(hopTerdekat(req.headers.get("x-vercel-forwarded-for"))) ??
-    normalisasiIp(req.headers.get("x-real-ip")) ??
-    normalisasiIp(hopTerdekat(req.headers.get("x-forwarded-for")));
-
+  const ip = normalisasiIp(clientIpFrom(req.headers));
   return ip
     ? { kunci: `ip:${ip}`, maks: MAKS_PER_IP }
     : { kunci: KUNCI_TANPA_IDENTITAS, maks: MAKS_TANPA_IDENTITAS };

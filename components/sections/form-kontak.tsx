@@ -63,7 +63,7 @@ import type { FormKontakCopy } from "@/content/copy";
  *    pun yang mengimpornya — termasuk `components/wa-button.tsx`. `"use client"`
  *    di baris 1 menarik SELURUH graf impor berkas ini ke bundel browser, dan
  *    `site` ikut sebagai objek utuh: `email` (alamat pribadi owner yang dilarang
- *    terbit oleh ADR 2026-08-24), `domain`, `location`, `tagline`. Bukan hanya di
+ *    terbit oleh ADR 2026-08-24), `location`, `tagline`. Bukan hanya di
  *    /kontak — modulnya mendarat di chunk bersama yang dimuat SETIAP rute. Terukur
  *    saat regresi ini terjadi: chunk bersama 32.810 → 33.695 B, dan
  *    `grep -rlF "<alamat email owner>" .next/static/` menemukan berkas
