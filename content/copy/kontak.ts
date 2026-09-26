@@ -196,6 +196,8 @@ export type FormKontakCopy = {
    */
   pemeriksaan: { menunggu: string };
   catatanPrivasi: string;
+  /** Tampil hanya bila Turnstile aktif (G-46). */
+  catatanPemeriksaan: string;
 };
 
 export type KontakCopy = {
@@ -383,6 +385,10 @@ export const kontak: KontakCopy = {
     // ketiga — kalau ternyata iya, kalimat privasi ini WAJIB diubah agar tetap jujur.
     catatanPrivasi:
       "Data yang Anda kirim hanya dipakai untuk membalas pertanyaan ini. Kami tidak menyimpannya di database situs dan tidak membagikannya ke pihak lain untuk keperluan pemasaran, sejalan dengan UU PDP No. 27/2022.",
+    // G-46: hanya tampil bila Turnstile aktif — Cloudflare ikut memproses data teknis
+    // perangkat pengunjung, jadi kalimat privasi di atas saja tidak lagi lengkap.
+    catatanPemeriksaan:
+      "Form ini dilindungi Cloudflare Turnstile untuk menangkal spam. Untuk pemeriksaan itu, Cloudflare memproses data teknis perangkat Anda (seperti alamat IP dan jenis peramban) sesuai kebijakan privasinya; isi pesan Anda tidak dikirim ke Cloudflare.",
   },
 
   penutup: {

@@ -5,6 +5,10 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ## [Unreleased]
 
+### Changed
+
+- G-46 (2026-09-27, keputusan owner): Turnstile kini **fail-closed** — siteverify tak terjangkau → `/api/lead` 503 + arahan WhatsApp (sebelumnya diloloskan). Catatan privasi baru di /kontak (hanya bila Turnstile aktif) menyebut Cloudflare memproses data teknis perangkat untuk pemeriksaan spam.
+
 ### Fixed
 
 - G-45 (2026-09-27): tombol WhatsApp mengambang disembunyikan di layar < 640 px pada halaman yang memuat form kontak (`body:has([data-form-kontak]) .wa-mengambang`), karena di 390 px ia menutupi sisi kanan widget Turnstile dan tombol kirim; /kontak tetap punya tombol WA sendiri.

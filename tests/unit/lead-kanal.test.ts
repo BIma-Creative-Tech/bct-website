@@ -367,10 +367,12 @@ describe("POST /api/lead — Turnstile (G-43)", () => {
     expect(m.kirimEmailLead).not.toHaveBeenCalled();
   });
 
-  it("siteverify tak terjangkau → fail-open (200), token tetap wajib ada", async () => {
+  it("siteverify tak terjangkau → fail-closed (503, tanpa surel), token tetap wajib ada", async () => {
     const POST = await muat(tsEnv("0x4AAAAAAAprodpalsu"));
     pasangSiteverify(() => new TypeError("fetch failed"));
-    expect((await kirim(POST, denganToken())).status).toBe(200);
+    expect((await kirim(POST, denganToken())).status).toBe(503);
+    expect((await kirim(POST, { ...denganToken(), website: "http://spam.example" })).status).toBe(503);
+    expect(m.kirimEmailLead).not.toHaveBeenCalled();
     expect((await kirim(POST)).status).toBe(403);
   });
 

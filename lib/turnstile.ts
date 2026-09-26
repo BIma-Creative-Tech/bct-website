@@ -42,7 +42,7 @@ export const RAHASIA_UJI = new Set([
  * - `lolos`            → lanjut.
  * - `ditolak`          → Cloudflare menjawab bukan manusia / token tidak sah → 403 generik.
  * - `tak-terjangkau`   → siteverify tidak menjawab (jaringan/tenggat/5xx/internal-error).
- *                        Route memperlakukannya LOLOS (fail-open) — alasannya di ADR G-43.
+ *                        Route MENOLAK dengan 503 (fail-closed, keputusan owner, ADR G-46).
  * - `galat-konfigurasi`→ berkas secret tidak terbaca → 503 (form tidak tersedia).
  */
 export type HasilTurnstile = "lolos" | "ditolak" | "tak-terjangkau" | "galat-konfigurasi";

@@ -1071,8 +1071,8 @@ export async function POST(req: NextRequest) {
   // SEBELUM anggaran: token gagal tidak pernah memakan jatah surel. Token gagal → 403 generik,
   // SAMA PERSIS dengan Origin asing dan "terlalu cepat" — satu pintu "ditolak" tanpa status
   // khusus yang memberi tahu bot bahwa yang salah hanya tokennya.
-  // Siteverify tak terjangkau → DILOLOSKAN (fail-open, ADR G-43): pengunjung sah tidak dihukum
-  // karena gangguan Cloudflare, dan anggaran G-42 tetap memagari jumlah surel.
+  // Siteverify tak terjangkau → DITOLAK (fail-closed, keputusan owner 2026-09-27, ADR G-46):
+  // 503 + arahan WhatsApp, sama untuk kiriman sah dan jebakan. Menggantikan fail-open G-43.
   const turnstile = konfigurasiTurnstile();
   if (turnstile) {
     const hasil = await periksaTurnstile(parsed.data["cf-turnstile-response"], {
@@ -1080,7 +1080,9 @@ export async function POST(req: NextRequest) {
       aksi: AKSI_PEMERIKSAAN,
     });
     if (hasil === "ditolak") return balas({ error: PESAN_GAGAL }, 403);
-    if (hasil === "galat-konfigurasi") return balas({ error: PESAN_TIDAK_TERSEDIA }, 503);
+    if (hasil === "galat-konfigurasi" || hasil === "tak-terjangkau") {
+      return balas({ error: PESAN_TIDAK_TERSEDIA }, 503);
+    }
   }
 
   // Anggaran kirim (G-42, menutup H-1). Dikonsumsi di SATU titik untuk kiriman sah dan jebakan,

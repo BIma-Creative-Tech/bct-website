@@ -731,6 +731,9 @@ export function FormKontak({
       </div>
 
       <p className="mt-8 max-w-[65ch] text-sm text-ink-2">{copy.catatanPrivasi}</p>
+      {kunciPemeriksaan ? (
+        <p className="mt-2 max-w-[65ch] text-sm text-ink-2">{copy.catatanPemeriksaan}</p>
+      ) : null}
 
       {/* Pesan untuk pengunjung tanpa JavaScript, TEPAT di atas tombol kirim: ia
           dibaca sebelum tombol yang tidak akan bekerja itu sempat ditekan.
