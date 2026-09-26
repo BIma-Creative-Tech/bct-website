@@ -9,6 +9,12 @@ import { z } from "zod";
  *     SMTP_USER, SMTP_FROM_ADDRESS, SMTP_PASSWORD_FILE wajib; SMTP_PORT default 587
  *     (465 = TLS implisit, lainnya STARTTLS wajib — ditegakkan di lib/mailer.ts).
  *   SMTP_PASSWORD_FILE = PATH file secret (dibaca saat kirim), bukan password.
+ *   TURNSTILE_SITE_KEY + TURNSTILE_SECRET_FILE (G-43, opsional BERPASANGAN) — keduanya kosong →
+ *     Turnstile mati (form seperti sebelumnya); keduanya terisi → widget di /kontak + verifikasi
+ *     server; hanya salah satu → boot gagal (exit 1). Site key PUBLIK tapi sengaja BUKAN
+ *     NEXT_PUBLIC_* (nilai itu dibakar saat build, sedangkan satu image melayani staging &
+ *     production dengan widget berbeda; dan `assertNoPublicSecrets` menolak NEXT_PUBLIC_*_KEY):
+ *     dibaca server saat request dan dioper ke form sebagai prop. Secret = PATH file.
  *
  * Divalidasi saat boot (instrumentation.ts) → container exit 1 bila salah. Dibaca lazy
  * (getEnv) sehingga `next build` TIDAK membutuhkan env runtime: semua halaman dirender
@@ -43,8 +49,19 @@ export const envSchema = z
     SMTP_USER: optionalString,
     SMTP_FROM_ADDRESS: z.email({ message: "harus alamat email" }).optional(),
     SMTP_PASSWORD_FILE: optionalString,
+    TURNSTILE_SITE_KEY: optionalString.pipe(
+      z.string().regex(/^[A-Za-z0-9_-]{10,100}$/, { message: "format site key tidak sah" }).optional(),
+    ),
+    TURNSTILE_SECRET_FILE: optionalString,
   })
   .superRefine((env, ctx) => {
+    if (Boolean(env.TURNSTILE_SITE_KEY) !== Boolean(env.TURNSTILE_SECRET_FILE)) {
+      const hilang = env.TURNSTILE_SITE_KEY ? "TURNSTILE_SECRET_FILE" : "TURNSTILE_SITE_KEY";
+      ctx.addIssue({ code: "custom", path: [hilang], message: "wajib berpasangan (isi keduanya atau kosongkan keduanya)" });
+    }
+    if (env.TURNSTILE_SECRET_FILE && !env.TURNSTILE_SECRET_FILE.startsWith("/")) {
+      ctx.addIssue({ code: "custom", path: ["TURNSTILE_SECRET_FILE"], message: "harus path absolut" });
+    }
     if (!env.CONTACT_ENABLED) return;
     for (const key of ["SMTP_HOST", "SMTP_USER", "SMTP_FROM_ADDRESS", "SMTP_PASSWORD_FILE"] as const) {
       if (!env[key]) {
@@ -57,6 +74,11 @@ export const envSchema = z
   });
 
 export type Env = z.infer<typeof envSchema>;
+
+/** Turnstile aktif = kedua env terisi (pasangan yang tidak lengkap sudah ditolak skema). */
+export function turnstileAktif(env: Env): env is Env & { TURNSTILE_SITE_KEY: string; TURNSTILE_SECRET_FILE: string } {
+  return Boolean(env.TURNSTILE_SITE_KEY && env.TURNSTILE_SECRET_FILE);
+}
 
 const SECRET_LIKE = /(SECRET|PASSWORD|PASSWD|TOKEN|PRIVATE|SMTP|WEBHOOK|_KEY$|^KEY)/i;
 

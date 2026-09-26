@@ -65,3 +65,9 @@ export const ANGGARAN_KIRIM = {
   perIpPerHari: 3,
 } as const;
 
+/**
+ * `action` widget Turnstile (G-43). Klien memasangnya saat render, server memeriksa bahwa
+ * `action` di jawaban siteverify sama persis — token dari widget/halaman lain ditolak.
+ * Aturan Cloudflare: ≤ 32 karakter, alfanumerik/`_`/`-`.
+ */
+export const AKSI_PEMERIKSAAN = "kontak";

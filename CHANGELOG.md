@@ -8,6 +8,7 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 ### Security
 
 - G-42 (2026-09-26, keputusan owner; menutup **H-1** audit ulang G-19): `lib/anggaran-kirim.ts` — anggaran kirim in-memory untuk `/api/lead`: ember token situs (ledakan 8, terisi 20/jam) + jendela geser 60 menit (≤ 20) + atap 3/hari per IP; penolakan satu atap tidak memakan jatah atap lain. Konstanta `ANGGARAN_KIRIM` di `app/api/lead/batas.ts`, di bawah batas mailbox `info@` (30/jam, ledakan 10): kiriman ≤ 10 + 30·t/jam untuk setiap selang t. Uji `tests/unit/anggaran-kirim.test.ts` (8).
+- G-43 (2026-09-26, keputusan owner; bagian (b) G-20): **Cloudflare Turnstile opsional** — `lib/turnstile.ts` (siteverify tanpa paket npm: wajib `success === true`, `hostname` = host `SITE_URL`, `action` = `kontak`; tenggat 5 s; satu coba ulang hanya pada galat jaringan dengan `idempotency_key` sama; token sekali pakai lewat cache lokal 300 s + Cloudflare; `remoteip` tidak dikirim; pengecualian sempit untuk tiga secret UJI Cloudflare yang menjawab `hostname: example.com`). Env berpasangan `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_FILE` (`lib/env.ts`; salah satu saja → exit 1; `instrumentation.ts` memeriksa berkas secret terbaca & tidak kosong dan memperingatkan kunci uji). CSP bersyarat (`lib/csp.ts`, `proxy.ts`): hanya bila aktif, `script-src` + `https://challenges.cloudflare.com` dan `frame-src 'self' https://challenges.cloudflare.com`; mati → CSP identik. Uji `turnstile` (14, fetch di-mock dengan perilaku kunci uji resmi), `env-turnstile` (11), `csp` (+2).
 
 ### Changed
 

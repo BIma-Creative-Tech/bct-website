@@ -14,7 +14,15 @@ import { buildCsp, generateNonce } from "@/lib/csp";
 
 export function proxy(request: NextRequest) {
   const nonce = generateNonce();
-  const csp = buildCsp(nonce, process.env.NODE_ENV === "development", process.env.NEXT_PUBLIC_UMAMI_SRC);
+  // Turnstile (G-43): tambahan CSP hanya bila widget aktif. Cukup memeriksa site key — pasangan
+  // yang tidak lengkap sudah membuat boot gagal (instrumentation.ts), jadi tidak mungkin ada di sini.
+  const turnstile = Boolean(process.env.TURNSTILE_SITE_KEY?.trim());
+  const csp = buildCsp(
+    nonce,
+    process.env.NODE_ENV === "development",
+    process.env.NEXT_PUBLIC_UMAMI_SRC,
+    turnstile,
+  );
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);

@@ -14,7 +14,19 @@
  *   'unsafe-inline' diabaikan.
  * - font-src 'self' data: dipertahankan dari baseline lama.
  * - HSTS di Traefik (middleware security-headers), bukan di sini.
+ * - Turnstile (G-43) — HANYA bila `turnstile` true (env TURNSTILE_SITE_KEY terisi), di SEMUA
+ *   halaman (navigasi klien ke /kontak mempertahankan CSP dokumen halaman pertama). Tambahan
+ *   minimal sesuai docs Cloudflare "Content Security Policy" (dibaca 2026-09-26):
+ *     script-src + https://challenges.cloudflare.com — fallback peramban tanpa CSP3; di CSP3
+ *       'strict-dynamic' mengabaikan host, dan api.js dimuat oleh skrip ber-nonce milik form
+ *       (non-parser-inserted), yang memang diizinkan 'strict-dynamic';
+ *     frame-src 'self' https://challenges.cloudflare.com — widget adalah iframe; tanpa
+ *       frame-src, default-src 'self' memblokirnya ('self' dipertahankan = perilaku lama).
+ *   connect-src TIDAK ditambah: docs hanya memintanya untuk pre-clearance (tidak dipakai),
+ *   dan itu pun cukup 'self'. Nihil tambahan saat Turnstile mati — CSP identik dengan sebelum G-43.
  */
+export const ASAL_TURNSTILE = "https://challenges.cloudflare.com";
+
 export function umamiOrigin(src: string | undefined): string | null {
   if (!src) return null;
   try {
@@ -25,15 +37,17 @@ export function umamiOrigin(src: string | undefined): string | null {
   }
 }
 
-export function buildCsp(nonce: string, isDev = false, umamiSrc?: string): string {
+export function buildCsp(nonce: string, isDev = false, umamiSrc?: string, turnstile = false): string {
   if (!/^[A-Za-z0-9+/=_-]{16,}$/.test(nonce)) {
     throw new Error("nonce tidak valid");
   }
   const umami = umamiOrigin(umamiSrc);
   const extra = umami ? ` ${umami}` : "";
+  const ts = turnstile ? ` ${ASAL_TURNSTILE}` : "";
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}${extra}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}${extra}${ts}`,
+    ...(turnstile ? [`frame-src 'self' ${ASAL_TURNSTILE}`] : []),
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",

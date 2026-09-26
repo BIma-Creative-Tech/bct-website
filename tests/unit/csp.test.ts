@@ -55,3 +55,27 @@ describe("CSP ber-nonce (lib/csp.ts)", () => {
     expect(() => buildCsp("short", false)).toThrow();
   });
 });
+
+describe("CSP — Turnstile (G-43)", () => {
+  it("mati (bawaan): identik dengan tanpa argumen — nihil challenges.cloudflare.com, nihil frame-src", () => {
+    const n = generateNonce();
+    expect(buildCsp(n, false, undefined, false)).toBe(buildCsp(n, false));
+    expect(buildCsp(n, false)).not.toContain("challenges.cloudflare.com");
+    expect(buildCsp(n, false)).not.toContain("frame-src");
+  });
+
+  it("aktif: hanya script-src + frame-src bertambah; connect-src, frame-ancestors tetap", () => {
+    const n = generateNonce();
+    const csp = buildCsp(n, false, undefined, true);
+    expect(directive(csp, "script-src")).toBe(
+      `script-src 'self' 'nonce-${n}' 'strict-dynamic' https://challenges.cloudflare.com`,
+    );
+    expect(directive(csp, "frame-src")).toBe("frame-src 'self' https://challenges.cloudflare.com");
+    expect(directive(csp, "connect-src")).toBe("connect-src 'self'");
+    expect(directive(csp, "frame-ancestors")).toBe("frame-ancestors 'none'");
+    expect(directive(csp, "script-src")).not.toContain("unsafe-inline");
+    const tanpa = buildCsp(n, false).split("; ");
+    const dengan = csp.split("; ");
+    expect(dengan.filter((d) => !tanpa.includes(d))).toHaveLength(2);
+  });
+});
