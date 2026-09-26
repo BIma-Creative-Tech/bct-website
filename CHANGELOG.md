@@ -5,8 +5,15 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ## [Unreleased]
 
+### Removed
+
+- G-35: `.github/workflows/release.yml` dihapus — rilis tag `vX.Y.Z` kini job `image` di `ci.yml` yang hanya push setelah semua pemeriksaan + Trivy + smoke test hijau (menutup MEDIUM audit G-15 putaran 1: release lama push ke GHCR tanpa gerbang, cek CHANGELOG-nya berjalan sesudah push). Tag `latest` tidak lagi diterbitkan.
+
 ### Added
 
+- G-35: `scripts/check-csp.mjs` — guard G-15 diadaptasi: memeriksa header CSP yang BENAR-BENAR dikirim server (satu kebijakan, `'nonce-…'` acak per request + `'strict-dynamic'`, nihil `'unsafe-eval'`, nihil `'unsafe-inline'` di script-src, semua `<script>` membawa nonce). Dipakai smoke test CI.
+- G-35: `scripts/check-pii.mjs` — guard G-22 dibangun ulang (versi branch `ci/guards` tidak tersedia): gagal bila `site.email`/`site.location` muncul di `.next/static/**` DAN prerender `.next/server/app/**` (.html/.rsc/.body/.meta); nilai dibaca dari `content/site.ts`, tidak pernah dicetak; fail-closed.
+- G-35: `.githooks/pre-commit` — gitleaks (image di-pin digest) atas perubahan staged, disalin dari web-starter. Aktivasi sekali per clone: `git config core.hooksPath .githooks`.
 - G-31 (2026-09-26): URL publik kanonik dari env runtime `SITE_URL` (pola web-starter): `lib/env.ts` (zod; wajib http(s), garis miring penutup dibuang, tolak `NEXT_PUBLIC_*` mirip secret), `lib/site.ts` (`isIndexable`, `siteUrl`, `urlKanonik`), `instrumentation.ts` (validasi saat boot → `process.exit(1)` bila salah). `app/layout.tsx` kini `generateMetadata()` dengan `metadataBase = SITE_URL` + `robots` `noindex, nofollow` untuk host berlabel `staging`/localhost; `app/robots.ts` → `Disallow: /` di host itu; `app/sitemap.ts` + `app/robots.ts` `force-dynamic`. `next build` tidak butuh `SITE_URL` (semua halaman dinamis).
 - G-31: `GET /api/health` → 200 `{"status":"ok"}` + `Cache-Control: no-store` (kontrak healthcheck container, sama dengan web-starter).
 - G-32 (2026-09-26): CSP ber-nonce per request lewat `proxy.ts` + `lib/csp.ts` (port web-starter): `script-src 'self' 'nonce-…' 'strict-dynamic'` **tanpa `'unsafe-inline'`**, `'unsafe-eval'` tetap hanya `next dev` (G-14), origin https Umami (`NEXT_PUBLIC_UMAMI_SRC`) tetap diizinkan di script-src/connect-src, plus `object-src 'none'` dan `upgrade-insecure-requests` baru. Layout memanggil `connection()` agar Next menempelkan nonce ke skripnya.
@@ -36,6 +43,9 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ### Changed
 
+- G-34 (2026-09-26): `Dockerfile` diport dari web-starter — base `node:24.21.0-alpine` di-pin tag + digest (bukan `node:22-alpine`), user 1001:1001 (bukan `node`), npm/npx/corepack dihapus dari runner, berkas aplikasi milik root (read-only bagi app), `/app/.next/cache` mode 1777 untuk tmpfs, `NODE_ENV=production` eksplisit di stage build (G-15), HEALTHCHECK `fetch /api/health` (bukan `wget /`). Beda dari web-starter: `sharp` TIDAK dibuang (optimasi `next/image` untuk foto hero). `.dockerignore` mengikuti web-starter (+`.claude`, `.vercel`, `docker-compose.yml`).
+- G-34: `docker-compose.yml` kini **khusus uji lokal** meniru hardening template infra (read_only, tmpfs `/tmp` 16m + `/app/.next/cache` 64m uid 1001, `cap_drop: ALL`, no-new-privileges, mem 256m/cpu 0.5/pids 128, healthcheck) dengan port HANYA `127.0.0.1:3000`; image `bct-website:local` (bukan `ghcr.io/sarangrumah/bct-website:latest`). Deploy lewat `/opt/infra/scripts/provision-web-client.sh`.
+- G-35 (2026-09-26): `.github/workflows/ci.yml` diganti pipeline web-starter: actionlint, gitleaks (full history), Semgrep, Trivy fs+config, Hadolint, lint/typecheck/test/audit/build (+ governance + guard PII), lalu image → Trivy image → smoke test kontrak (read-only, uid 1001, cap_drop ALL; 11 rute 200, 404, CSP nonce, `check-csp.mjs`, noindex/robots, `/_next/image`, `/api/lead` 503/403) → push `ghcr.io/bctech-adm/bct-website` (`:sha-<12>` di main, `:X.Y.Z` untuk tag `vX.Y.Z` = `package.json` dan tercatat di CHANGELOG). Semua action di-pin SHA, semua tool di-pin digest, `permissions: contents: read` (hanya job image `packages: write`).
 - G-31: `site.domain` (`http://localhost:3000` hard-coded) dihapus dari `content/site.ts`; metadataBase, canonical, og:url, URL kartu OG, `sitemap.xml`, dan baris `Sitemap:` robots kini mengikuti `SITE_URL` saat request. Satu image untuk staging dan production.
 - G-32: `next.config.ts` tidak lagi mengirim CSP (pindah ke `proxy.ts`) dan **tidak lagi mengirim HSTS** — HSTS milik middleware `security-headers` Traefik (nilai platform, tanpa includeSubDomains/preload; alasan di ADR 2026-09-26). `Permissions-Policy` diperketat (+`payment`, `usb`, `browsing-topics`), `Cross-Origin-Opener-Policy: same-origin` ditambahkan. Optimasi `next/image` dipertahankan (foto hero), berbeda dari web-starter.
 - `scripts/check-governance.mjs`: cakupan "perubahan kode" diperluas ke `lib/`, `scripts/`, `tests/`, `.githooks/`, `proxy.ts`, `instrumentation.ts`, `vitest.config.mts`, `package-lock.json`, `.npmrc`, `.dockerignore`.

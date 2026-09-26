@@ -1,18 +1,36 @@
-# Produksi mini di VPS: `docker compose up -d`
-# Untuk deploy utama tetap Vercel; compose ini untuk fallback/self-host & uji lokal.
+# UJI LOKAL SAJA (smoke test kontrak image) — BUKAN jalur deploy (ADR 2026-09-26).
+# Deploy staging/production lewat repo infra:
+#   /opt/infra/scripts/provision-web-client.sh bct <staging|prod> --host <fqdn> --image ghcr.io/bctech-adm/bct-website:<ver>
+# yang merender templates/web-client/docker-compose.yml (network web-edge, di belakang Traefik).
+#
+# Hardening di bawah MENIRU template infra (read_only + tmpfs, uid 1001, cap_drop ALL,
+# no-new-privileges, limit mem/cpu/pids, healthcheck) supaya yang lolos di sini lolos juga di VPS.
+# Port HANYA di 127.0.0.1: tanpa Traefik di depan, X-Forwarded-For bisa dikarang klien
+# (lib/client-ip.ts) — jangan pernah membuka port ini ke publik.
+#
+#   docker compose up -d --build && curl -s 127.0.0.1:3000/api/health
 services:
   web:
     build: .
-    image: ghcr.io/sarangrumah/bct-website:latest
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_UMAMI_SRC=${NEXT_PUBLIC_UMAMI_SRC:-}
-      - NEXT_PUBLIC_UMAMI_ID=${NEXT_PUBLIC_UMAMI_ID:-}
-      - LEAD_WEBHOOK_URL=${LEAD_WEBHOOK_URL:-}
+    image: bct-website:local
+    user: "1001:1001"
     read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
+      LEAD_WEBHOOK_URL: ${LEAD_WEBHOOK_URL:-}
     tmpfs:
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
+      - /tmp:uid=1001,gid=1001,mode=0700,size=16m
+      - /app/.next/cache:uid=1001,gid=1001,mode=0700,size=64m
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
