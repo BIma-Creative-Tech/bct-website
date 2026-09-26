@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { buatAnggaran } from "@/lib/anggaran-kirim";
 import { clientIpFrom } from "@/lib/client-ip";
-import { getEnv, type Env } from "@/lib/env";
+import { getEnv, turnstileAktif, type Env } from "@/lib/env";
 import { PENERIMA_LEAD } from "@/lib/lead-recipient";
 import { kirimEmailLead } from "@/lib/mailer";
-import { BATAS_ISIAN } from "./batas";
+import { periksaTurnstile } from "@/lib/turnstile";
+import { AKSI_PEMERIKSAAN, ANGGARAN_KIRIM, BATAS_ISIAN } from "./batas";
 
 /**
  * Endpoint form lead — dikeraskan setelah audit keamanan (G-05).
@@ -29,12 +31,16 @@ import { BATAS_ISIAN } from "./batas";
  * - Jebakan bot tidak boleh bisa dikenali dari LUAR — bukan hanya status/body/header,
  *   tapi juga waktu respons (G-19).
  *
- * TIGA HAL YANG SENGAJA BELUM DIKERJAKAN (menunggu keputusan owner):
- * 1. Penyimpanan rate limit bersama (KV/Redis) — butuh layanan + dependensi baru (G-16).
+ * URUTAN PAGAR (penting — lihat `POST`): Origin → content-type → rate limit per menit →
+ * body/zod → ambang waktu isi → kanal ada? → Turnstile (G-43, bila aktif) → ANGGARAN KIRIM
+ * (G-42: situs 20/jam + ledakan 8, IP 3/hari) → cabang jebakan / penerusan nyata. Turnstile
+ * SEBELUM anggaran: token yang gagal tidak pernah memakan jatah surel. Anggaran SEBELUM cabang
+ * jebakan: jebakan dan kiriman sah memakan jatah yang sama di titik yang sama.
+ *
+ * DUA HAL YANG SENGAJA BELUM DIKERJAKAN (menunggu keputusan owner):
+ * 1. Penyimpanan rate limit/anggaran bersama (KV/Redis) — butuh layanan + dependensi baru (G-16).
  * 2. Pengerasan tujuan webhook (wajib https + header rahasia) — menyentuh data pribadi.
- * 3. Captcha (Turnstile/hCaptcha) — G-20 bagian (b), dependensi + layanan pihak ketiga,
- *    jadi gerbang konfirmasi owner. Yang dikerjakan di berkas ini hanya bagian (a):
- *    Origin, content-type, dan ambang waktu isi form.
+ * (Captcha G-20b kini ada: Cloudflare Turnstile opsional, G-43.)
  */
 
 // ————————————————————————————————————————————————————————————————
@@ -85,7 +91,7 @@ const BATAS_WAKTU_EMAIL_MS = 10_000;
  * Nilainya dilaporkan klien (`sejakDibuka`, diukur `performance.now()` di browser),
  * jadi BISA dipalsukan oleh siapa pun yang membaca bundel JS. Itu memang batasnya:
  * pagar ini menaikkan biaya otomasi naif, bukan membuktikan kemanusiaan. Yang
- * membuktikan = captcha (G-20b, gerbang owner).
+ * membuktikan = captcha: Cloudflare Turnstile opsional (G-20b → G-43).
  */
 const AMBANG_ISI_MS = 3_000;
 
@@ -420,6 +426,10 @@ const LeadSchema = z.object({
   // Nilainya cuma dipakai untuk satu perbandingan `< AMBANG_ISI_MS`, jadi semua
   // angka di atas ambang setara; memotongnya membuang angka konyol tanpa pernah
   // menolak kiriman.
+  // Token Cloudflare Turnstile (G-43). `unknown`, bukan string ber-batas: bentuk yang salah
+  // ditolak `periksaTurnstile` dengan balasan yang sama dengan token gagal (403), bukan 422 —
+  // supaya tidak ada status khusus untuk "tokennya cacat". Diabaikan bila Turnstile mati.
+  "cf-turnstile-response": z.unknown().optional(),
   sejakDibuka: z
     .number()
     .int()
@@ -435,138 +445,63 @@ function honeypotTerisi(nilai: unknown): boolean {
 }
 
 // ————————————————————————————————————————————————————————————————
-// Menutup oracle waktu pada jebakan (G-19a)
+// Menutup oracle waktu & status pada jebakan (G-19a; model G-44, 2026-09-26)
 // ————————————————————————————————————————————————————————————————
-// Cabang jebakan membalas 200 dengan body dan header yang identik dengan kiriman
-// sukses — tapi ia `return` tanpa pernah memanggil webhook, sehingga SELALU jauh
-// lebih cepat. Terukur security-auditor dengan webhook berlatensi 200 ms:
-// terperangkap median 3,7 ms vs sah median 215,9 ms. Dua kelompok yang terpisah
-// sempurna: satu pasang request cukup untuk menemukan nama field jebakan, dan
-// sesudah itu jebakannya hangus selamanya.
+// Cabang jebakan membalas dengan body dan header yang identik dengan kiriman sah, tapi
+// TIDAK PERNAH meneruskan apa pun — nol email, nol webhook (keputusan owner 2026-09-26,
+// menutup M-2 audit ulang G-19). Supaya ia tidak bisa dikenali dari WAKTU (terukur dulu:
+// jebakan med 3,7 ms vs sah med 215,9 ms) maupun STATUS, ia menunggu dan membalas menurut
+// MODEL penerusan nyata yang dibangun HANYA dari kiriman sah di proses ini:
 //
-// Perbaikannya: cabang jebakan menunggu selama waktu yang DIHABISKAN KIRIMAN SAH
-// setelah titik yang sama di alurnya. Yang dipakai hanya pengukuran nyata — sisa
-// waktu kiriman sah yang BERHASIL disimpan di cincin kecil di bawah, satu contoh
-// diambil dengan bobot condong ke yang paling baru, lalu ditidurkan sampai tenggat
-// absolut. Tidak ada satu pun angka karangan di dalamnya, dan tidak ada goyangan
-// buatan di atasnya (lihat "TIDAK ADA JITTER BUATAN"): sebaran kedua kelompok
-// saling tumpang tindih karena contohnya memang berasal dari kelompok yang ditiru.
+// 1. SUKSES, cincin cukup (≥ CONTOH_MINIMAL): satu contoh durasi kiriman sah yang berhasil,
+//    condong ke yang terbaru, dengan beban sepadan (lihat `pilihContoh`) → tidur sampai tenggat
+//    absolut → 200. Sebaran jebakan = sebaran kiriman sah karena contohnya memang dari sana.
+// 2. SUKSES, cincin belum cukup (proses baru): contoh dari `contohAwal` — SEMUA kiriman sah
+//    sukses yang sudah ada, termasuk yang pertama. Baru bila BELUM ADA SATU PUN kiriman sah di
+//    proses ini dipakai PRIOR konservatif (`dariPrior`) — satu-satunya angka karangan, dan pada
+//    keadaan itu penyerang juga belum punya satu pun kiriman sah di proses ini sebagai pembanding.
+// 3. GAGAL (M-1): kalau kiriman sah TERAKHIR berakhir gagal, jebakan dibalas 502 dengan waktu
+//    dari cincin gagal — cukup SATU contoh (kegagalan selalu dicatat, termasuk yang pertama).
+//    Dulu cincin sukses yang sudah panas tetap dipilih sehingga jebakan dibalas 200 sementara
+//    kiriman sah 502; status itu sendiri membocorkan field jebakan.
+// 4. ANGGARAN HABIS / tanpa kanal: dibalas 503 di titik SEBELUM cabang ini (kode yang sama
+//    untuk kiriman sah dan jebakan), jadi tidak ada yang perlu ditiru.
 //
-// KENAPA TIDAK ADA LAGI TEBAKAN AWAL (koreksi 2026-08-26, audit ulang G-19).
-// Versi sebelumnya menyemai 16 slot dengan konstanta 220 ms. Terukur pada instans
-// dingin: webhook 900 ms → jebakan med 232,7 ms vs sah med 927,6 ms; webhook
-// 30 ms → jebakan med 234,8 ms vs sah med 60,3 ms. Terpisah SEMPURNA ke dua arah
-// berlawanan, karena jeda jebakan terpaku di angka semaian apa pun webhooknya.
-// Lebih buruk lagi, cabang jebakan tidak pernah menulis ke cincin, jadi penyerang
-// yang HANYA mengirim jebakan membuat instans itu dingin selamanya. Di Vercel
-// (instans lahir-mati terus, BCT beberapa lead/hari) cincin dingin adalah keadaan
-// NORMAL, bukan transien — jadi ini bukan kasus tepi.
+// MEKANISME KALIBRASI LAMA DICABUT (G-44). Dulu, selama cincin belum punya CONTOH_MINIMAL
+// pengukuran, jebakan diperlakukan PERSIS seperti kiriman sah dan ikut diteruskan
+// (≤ MAKS_KALIBRASI_JEBAKAN=10 per proses, plus penyegaran tiap JEDA_KALIBRASI_MS). Waktunya
+// identik karena kodenya sama — tapi setiap kalibrasi adalah surel spam nyata ke info@ yang
+// membakar kuota mailbox 30/jam (M-2), dan ADR 2026-08-26 sudah mencatat bahwa atapnya
+// pernah tidak tertegakkan. Penggantinya prior (butir 2) + atap anggaran (G-42): setiap probe
+// — sah atau jebakan — kini memakan satu dari 20 kiriman/jam situs dan satu dari 3/hari per
+// IP, jadi penyerang tidak bisa lagi mengumpulkan ratusan pasang sampel untuk memisahkan
+// sebaran; jendela "proses dingin" yang tersisa berakhir begitu ada CONTOH_MINIMAL+1 lead sah.
 //
-// Menyamarkan waktu webhook menuntut PENGETAHUAN tentang waktu webhook, dan
-// satu-satunya sumber pengetahuan itu adalah menghubungi webhook. Jadi selama
-// belum ada satu pun pengukuran hanya tersedia tiga pilihan, semuanya berbayar:
-//   (1) Tebakan konstan (atau sebaran konstan) → yang barusan terbukti gagal
-//       total; menggantinya dengan konstanta lain hanya memindahkan arah bocor.
-//   (2) Menyamakan lantai: selama cincin kosong, TAHAN JUGA kiriman sah sampai
-//       lantai yang sama (mis. BATAS_WAKTU_WEBHOOK_MS). Tidak bocor sama sekali
-//       untuk webhook secepat apa pun, tapi ongkosnya jatuh ke pengunjung
-//       sungguhan — dan karena cincin dingin adalah keadaan normal, hampir setiap
-//       lead asli membayar 5 detik. DITOLAK: prinsip yang mengikat seluruh berkas
-//       ini (lihat blok "Bentuk permintaan") adalah menyusahkan satu pengunjung
-//       sah lebih mahal daripada meloloskan satu spam.
-//   (3) Selama cincin belum punya CONTOH_MINIMAL pengukuran, kiriman jebakan
-//       diperlakukan persis seperti kiriman sah — diteruskan ke webhook lewat
-//       jalur yang sama. DIPILIH. Waktunya bukan "mirip" melainkan identik, karena
-//       memang kode yang sama, dan panggilan itu sekaligus mengisi cincin sehingga
-//       jebakan berikutnya sudah punya pengukuran nyata.
+// BATAS YANG DITERIMA (dicatat, bukan terlupa):
+// L-1 Cincin hanya segar oleh kiriman SAH. Penyerang yang hanya mengirim jebakan melihat cincin
+//     yang membeku pada latensi terakhir yang diukur; kalau latensi mailbox bergeser tanpa lead
+//     sah di antaranya, jebakan meniru angka lama. Harganya dibatasi anggaran (butir di atas).
+// L-2 Tenggat email 10 s (BATAS_WAKTU_EMAIL_MS): server SMTP yang menerima DATA tepat sesudah
+//     route menyerah membuat surel sampai padahal pengunjung dibalas 502 — ia mengirim ulang dan
+//     owner menerima lead GANDA. Dipilih sadar: ganda lebih murah daripada hilang.
+// L-3 Cincin, prior, dan anggaran per proses (satu replika, lihat G-16).
+// L-4 Jedanya menahan slot server selama ±satu RTT kanal — biaya jebakan = biaya kiriman sah.
 //
-// HARGA PILIHAN (3), ditulis supaya tidak ada yang terkejut kemudian: paling banyak
-// MAKS_KALIBRASI_JEBAKAN kiriman spam bisa mendarat di sink owner SEUMUR PROSES,
-// dan hanya bila jebakan tiba tanpa ada lead asli di dekatnya. Yang TIDAK
-// diberikannya kepada penyerang adalah kemampuan baru: bot yang ingin isinya
-// sampai ke owner cukup TIDAK mengisi jebakan — jalur itu selalu terbuka dan hanya
-// dibatasi rate limit. Jadi (3) tidak menambah satu pun kemampuan, ia hanya
-// memindahkan sejumlah kecil kiriman dari "dibuang diam-diam" menjadi "diteruskan".
-//
-// KALIMAT DI ATAS DULU TIDAK BENAR, dan itu ditemukan security-auditor (G-24).
-// Atapnya diperiksa SESUDAH "cincin belum terkalibrasi", padahal cincin hanya terisi
-// oleh panggilan 2xx — jadi sink yang tidak pernah sukses = cincin dingin permanen =
-// penerusan TANPA BATAS. Terukur pada versi lama: sink yang selalu 500 → 25 dari 25
-// muatan jebakan mendarat; sink yang membalas 200 setelah 6 detik (route menyerah di
-// 5 detik) → 8 dari 8 mendarat dan benar-benar diproses sink. Sesudah urutannya
-// dibalik dan durasi GAGAL ikut dicatat di cincin terpisah: 5 dari 25 dan 6 dari 8,
-// dan sisanya dibalas 502 dengan waktu yang ditiru dari panggilan gagal yang nyata.
-// Urutan pemeriksaannya sekarang dijaga di `sumberJeda`; jangan dibalik lagi.
-// Efek sampingnya justru baik untuk satu kelompok pengunjung sungguhan: manusia
-// yang jebakannya terisi pengelola kata sandi / autofill — leadnya sekarang
-// benar-benar sampai, bukan hilang senyap.
-//
-// Sisa kiriman itu pun bisa dihapus seluruhnya: panggil webhook pada cabang jebakan
-// memakai muatan PENANDA tanpa data pengunjung. Itu mengubah APA yang dikirim ke
-// pihak ketiga (sink owner menerima jenis rekaman baru yang harus ia mengerti),
-// jadi gerbang konfirmasi owner — bukan keputusan builder, dan sengaja tidak
-// dikerjakan di sini.
-//
-// BATAS YANG PERLU DIKETAHUI:
-// 1. Cincin ini per instans, sama seperti rate limit (lihat G-16).
-// 2. Jedanya memang menahan slot server selama ±satu RTT webhook. Itu memang
-//    harganya: biaya permintaan jebakan dibuat sama dengan biaya kiriman sah.
-// 3. Sumbu STATUS. Kondisi "webhook gagal" tidak cuma bisa DITUNGGU penyerang, tapi
-//    bisa ia SEBABKAN — auditor membedakan 4 dari 8 ronde hanya dari status, dengan
-//    membanjiri 360 kiriman sah sampai sink yang menyerialkan mengantre melewati
-//    BATAS_WAKTU_WEBHOOK_MS; nol akses ke webhook, biaya hanya kiriman. Sekarang
-//    cabang jebakan ikut MENIRU balasan gagal: kalau bukti yang layak ditiru berasal
-//    dari cincin panggilan gagal, jebakan dibalas 502 dengan body dan header yang
-//    sama persis. Terukur pada sink yang selalu 500: 25 dari 25 jebakan dibalas 502,
-//    5 karena benar-benar diteruskan dan 20 karena menirunya, dengan waktu yang
-//    saling tumpang tindih (45–63 ms vs 45–64 ms). Yang MASIH bocor: instans yang
-//    cincin suksesnya sudah panas SEBELUM webhook rusak; di sana cincin sukses tetap
-//    dipilih dan jebakan dibalas 200 sementara kiriman sah dibalas 502. Sengaja tidak
-//    ditutup dengan menyembunyikan kegagalan dari kiriman sah: itu berarti membalas
-//    "terkirim" untuk lead yang tidak sampai, dan itu dilarang (ADR 2026-08-25).
-// 4. Peracunan cincin. Durasi yang berakhir GAGAL tidak pernah masuk cincin sukses:
-//    mencampurnya membuat banjir-sampai-timeout mengisi cincin dengan 4999 ms —
-//    persis pola yang dipakai auditor untuk memisahkan jebakan lewat uji satu sisi
-//    ">250 ms ⇒ jebakan". Yang tersisa sesudah itu (dan yang ditemukan auditor pada
-//    G-24): sink yang tetap SUKSES tapi lambat saat dibanjiri. Terukur pada sink yang
-//    menyerialkan 200 ms, 40 kiriman sah serentak → 24 sukses bermedian 2553 ms
-//    menelan seluruh 8 slot; sesudah antrean sink kosong, 10 probe jebakan beruntun
-//    menghasilkan 4/10, 6/10, dan 4/10 probe di atas 250 ms (4485–5005 ms) dengan
-//    0/10 positif palsu — bobot condong-baru dan JEDA_KALIBRASI_MS TIDAK cukup,
-//    karena probe jebakan tidak menyegarkan cincin.
-//    Yang menutupnya: setiap pengukuran ditandai `beban` (puncak panggilan webhook
-//    serentak saat ia diukur) dan cabang jebakan hanya boleh memakai pengukuran yang
-//    bebannya tidak lebih berat daripada beban sekarang. Contoh dari masa sibuk tidak
-//    pernah diputar ulang saat instans sepi; sebaliknya, saat banjir masih berlangsung
-//    contoh berbeban berat justru yang dipakai, sehingga jebakan ikut lambat seperti
-//    kiriman sah. Terukur sesudah perbaikan pada rig yang sama: 0/10, 0/10, 0/10 di
-//    atas 250 ms (jebakan 214–248 ms vs sah 204–234 ms), 0/10 positif palsu, dengan
-//    satu kiriman jebakan diteruskan per ronde untuk menyegarkan cincin.
-// 5. Kuota kalibrasi adalah ATAP KERAS, dan sesudah habis instans ini berhenti
-//    belajar. Bukti yang dipakai lalu boleh datang dari beban yang tidak sepadan
-//    (`longgar` di `pilihContoh`) — itu tebakan terbaik yang masih berupa angka
-//    nyata, tapi tetap tebakan. Menaikkan MAKS_KALIBRASI_JEBAKAN memperpanjang masa
-//    belajar dengan harga spam yang lebih banyak; arah tukarnya ditulis di sana.
+// Riwayat pengukuran rinci (peracunan cincin, penanda beban, satu hop penjadwal, koreksi
+// timer) dipertahankan di komentar tiap bagian di bawah; angka-angka G-19/G-24 itu diukur
+// pada versi yang masih meneruskan jebakan kalibrasi, dan hasil ukur model ini ada di
+// docs/checklist.md baris G-44.
 const CONTOH_DURASI_MAKS = 8;
 
 /**
- * Berapa pengukuran nyata yang harus ada sebelum cabang jebakan boleh berhenti
- * meneruskan dan mulai menjeda sendiri.
+ * Berapa pengukuran sukses nyata yang harus ada sebelum cincin menggantikan prior.
  *
- * KENAPA BUKAN 1 (diukur, bukan dikira-kira). Dengan satu contoh, jeda jebakan
- * terpaku pada satu angka — dan angka itu kebetulan yang paling tidak mewakili:
- * panggilan webhook PERTAMA sebuah proses membayar handshake TCP dan pemanasan
- * runtime. Terukur di rig ini pada webhook 900 ms: kiriman sah #1 = 1052,7 ms,
- * #2..#6 = 942,9 / 956,8 / 955,3 / 929,3 / 966,8 ms. Cincin berisi satu contoh
- * dingin membuat jebakan konsisten ±31 ms lebih lambat daripada kiriman sah yang
- * sudah hangat — terukur AUC 0,114, akurasi ambang terbaik 80%.
- *
- * KENAPA BUKAN 16 (saran auditor). Setiap pengukuran yang belum ada dibayar
- * dengan satu kiriman jebakan yang ikut diteruskan ke sink owner. 16 berarti
- * sampai 16 spam per instans; 4 sudah cukup untuk membuat contoh dingin kalah
- * suara oleh contoh hangat, dan sisanya diperbaiki pembobotan condong-baru.
- * Angka ini murni trade-off, dan arah tukarnya ditulis supaya bisa digeser sadar:
- * naik = jebakan makin sulit dibedakan, spam yang lolos makin banyak.
+ * KENAPA BUKAN 1 (diukur dulu). Dengan satu contoh, jeda jebakan terpaku pada satu angka —
+ * terukur pada webhook 900 ms: cincin berisi satu contoh dingin membuat jebakan konsisten
+ * ±31 ms lebih lambat daripada kiriman sah yang sudah hangat (AUC 0,114). 4 cukup untuk
+ * membuat contoh pertama kalah suara, sisanya diperbaiki pembobotan condong-baru.
+ * Sejak G-44 angka ini tidak lagi dibayar dengan spam (tidak ada jebakan yang diteruskan);
+ * yang dibayar adalah lamanya prior dipakai.
  */
 const CONTOH_MINIMAL = 4;
 
@@ -574,72 +509,54 @@ const CONTOH_MINIMAL = 4;
  * Satu pengukuran: SISA waktu sebuah kiriman sah, plus seberapa sibuk instans ini
  * ketika waktu itu diukur.
  *
- * `ms` diukur dari titik tepat sebelum `fetch(webhook)` sampai titik tepat sebelum
- * balasan disusun.
+ * `ms` diukur dari titik tepat sebelum penerusan (email/webhook) sampai titik tepat sebelum
+ * balasan disusun. Bagian sebelum titik itu (routing Next, baca body, zod, Turnstile,
+ * anggaran) TIDAK ditiru — ia benar-benar dijalani ulang oleh cabang jebakan dengan biaya
+ * yang berlaku SEKARANG (terukur dulu: merekam total handler membuat jebakan +8,9 ms lebih
+ * lambat pada instans yang cincinnya membeku di masa pemanasan, AUC 0,317).
  *
- * KENAPA POTONGAN ITU, bukan total waktu handler. Cabang jebakan menempel jeda ini
- * pada titik yang sama di alurnya sendiri, jadi bagian sebelum titik itu (routing
- * Next, baca body, JSON.parse, zod) TIDAK ditiru — melainkan benar-benar dijalani
- * ulang, dengan biaya yang berlaku SEKARANG. Itu penting: bagian itulah yang paling
- * banyak berubah sepanjang umur proses karena pemanasan JIT. Terukur, kiriman sah
- * awal sebuah proses ber-total ~950 ms sementara keadaan mapannya ~908 ms; kalau
- * total itu yang direkam dan diputar ulang, jebakan jadi konsisten +8,9 ms lebih
- * lambat pada instans yang cincinnya membeku di masa pemanasan (AUC 0,317).
- * Merekam potongan setelah titik itu saja membuat yang diputar ulang hanya waktu
- * yang memang tidak bisa diketahui sendiri oleh cabang jebakan: RTT webhook.
- *
- * `beban` = PUNCAK jumlah panggilan webhook yang berjalan berbarengan selama periode
- * sibuk tempat pengukuran ini lahir (1 = instans sepi). Penanda ini yang menutup
- * peracunan cincin: durasi kiriman sah tidak hanya ditentukan webhook, tapi juga oleh
- * antrean di depannya. Terukur pada rig ini dengan sink yang menyerialkan 200 ms:
- * 40 kiriman sah serentak → 24 sukses bermedian 2553 ms (yang terakhir 4,9 detik),
- * sementara kiriman sah yang sama saat instans sepi 205–219 ms. Satu angka tanpa
- * penanda tidak bisa dibedakan asalnya; dengan penanda, pengukuran dari masa sibuk
- * tidak pernah diputar ulang saat instans sudah sepi (lihat `pilihContoh`).
+ * `beban` = PUNCAK jumlah penerusan yang berjalan berbarengan selama periode sibuk tempat
+ * pengukuran ini lahir (1 = instans sepi). Penanda ini menutup peracunan cincin: terukur
+ * dengan sink yang menyerialkan 200 ms, 40 kiriman sah serentak → median 2553 ms, sementara
+ * saat sepi 205–219 ms. Pengukuran dari masa sibuk tidak diputar ulang saat instans sepi.
  */
 type Contoh = { ms: number; beban: number };
 
-/** Pengukuran kiriman sah yang BERAKHIR 2xx. Terbaru di indeks terakhir. */
+/** Pengukuran kiriman sah yang BERAKHIR SUKSES. Terbaru di indeks terakhir. */
 const contohSukses: Contoh[] = [];
 
 /**
- * Pengukuran kiriman sah yang BERAKHIR GAGAL (non-2xx, tak terjangkau, lewat batas
- * waktu). Cincin TERPISAH, dan itu bukan kerapian belaka — mencampurnya ke cincin
- * sukses adalah lubang yang sudah terukur: banjir-sampai-timeout mengisi cincin
- * dengan 4999 ms, lalu jebakan dipisahkan lewat uji satu sisi ">250 ms".
- *
- * Cincin ini HANYA dibaca ketika cincin sukses belum bisa dipakai, dan jebakan yang
- * menirunya ikut dibalas 502 — persis yang diterima kiriman sah pada keadaan itu.
- * Gunanya satu: memberi angka NYATA untuk ditiru ketika kuota `MAKS_KALIBRASI_JEBAKAN`
- * habis padahal webhook tidak pernah sukses sekali pun (lihat batas 5). Tanpa cincin
- * ini, satu-satunya cara mengisi cincin sukses adalah meneruskan jebakan tanpa batas
- * — terukur 25 dari 25 muatan jebakan mendarat di sink pada sink yang selalu 500.
+ * Pengukuran kiriman sah yang BERAKHIR GAGAL (email ditolak/putus/lewat tenggat, webhook
+ * non-2xx). Cincin TERPISAH: mencampurnya ke cincin sukses adalah lubang yang sudah terukur
+ * (banjir-sampai-timeout mengisi cincin dengan 4999 ms, lalu jebakan dipisahkan lewat uji satu
+ * sisi ">250 ms"). Dibaca hanya ketika kiriman sah terakhir gagal (M-1).
  */
 const contohGagal: Contoh[] = [];
 
 /**
- * Kiriman sah PERTAMA sebuah proses tidak pernah masuk cincin.
- *
- * Ia membayar hal-hal yang hanya terjadi sekali seumur proses — jabat tangan TCP
- * (plus TLS di produksi), pemanasan JIT, pemuatan modul undici — jadi ia bukan
- * contoh yang mewakili kiriman sah mana pun yang harus ditiru. Terukur pada
- * webhook 900 ms: kiriman sah #1 = 1052,7 ms, #2..#6 = 942,9 / 956,8 / 955,3 /
- * 929,3 / 966,8 ms. Membiarkannya masuk cincin membuat jebakan punya ekor atas
- * yang tidak dimiliki kiriman sah — dan ekor itu sendiri sudah cukup untuk
- * membedakan (AUC 0,336, akurasi 69,5% saat contoh dingin ini ikut).
- *
- * Ongkosnya satu kiriman jebakan lagi yang ikut diteruskan pada instans dingin
- * (jadi maksimum CONTOH_MINIMAL + 1), bukan risiko baru.
+ * Kiriman sah SUKSES pertama sebuah proses tidak masuk cincin: ia membayar jabat tangan
+ * TCP/TLS, pemanasan JIT, pemuatan modul — terukur #1 = 1052,7 ms vs #2..#6 = 929–967 ms
+ * pada webhook 900 ms. Membiarkannya masuk memberi jebakan ekor atas yang tidak dimiliki
+ * kiriman sah (AUC 0,336). Kegagalan TIDAK dibuang: M-1 menuntut jebakan meniru status gagal
+ * sejak kegagalan pertama, dan satu contoh nyata lebih baik daripada prior.
  */
 let pengukuranPertamaDibuang = false;
+
+/**
+ * Pengukuran sukses PALING AWAL proses ini (termasuk yang pertama, yang tidak masuk cincin),
+ * paling banyak CONTOH_MINIMAL + 1. Dipakai hanya selama cincin belum cukup: contoh nyata
+ * yang agak dingin tetap jauh lebih dekat ke kiriman sah daripada prior mana pun. Terukur di
+ * rig mailpit lokal (G-44): 4 pasang pertama proses dingin AUC 1,000 dengan prior saja.
+ */
+const contohAwal: Contoh[] = [];
 
 /** Atap contoh: batas waktu kanal terlama (email/webhook) plus kelonggaran sisa penanganan. */
 const ATAP_CONTOH_MS = Math.max(BATAS_WAKTU_WEBHOOK_MS, BATAS_WAKTU_EMAIL_MS) + 1_000;
 
 /**
- * Pelacak beban instans: berapa panggilan webhook yang sedang berjalan, dan berapa
- * puncaknya selama periode sibuk yang sedang berlangsung. Puncaknya dinolkan lagi
- * begitu tidak ada panggilan tersisa — jadi "sibuk" tidak pernah menempel selamanya.
+ * Pelacak beban instans: berapa penerusan yang sedang berjalan, dan berapa puncaknya selama
+ * periode sibuk yang sedang berlangsung. Puncaknya dinolkan lagi begitu tidak ada penerusan
+ * tersisa — jadi "sibuk" tidak pernah menempel selamanya.
  */
 let panggilanBerjalan = 0;
 let puncakPanggilan = 0;
@@ -656,23 +573,24 @@ function selesaiPanggilanWebhook(): void {
 
 /**
  * Beban yang akan dihadapi kiriman sah SEANDAINYA ia tiba sekarang: dirinya sendiri
- * ditambah yang sedang berjalan, tapi tidak pernah lebih rendah daripada puncak
- * periode sibuk yang sedang berlangsung. Bagian `puncak` itu penting: di tengah
- * banjir, jumlah yang sedang berjalan sudah menyusut sementara antrean sink belum
- * — memakai `panggilanBerjalan` saja membuat jebakan meniru keadaan sepi padahal
- * kiriman sah masih mengantre.
+ * ditambah yang sedang berjalan, tapi tidak pernah lebih rendah daripada puncak periode
+ * sibuk yang sedang berlangsung (di tengah banjir antrean sink belum surut walau jumlah yang
+ * berjalan sudah menyusut).
  */
 function bebanSekarang(): number {
   return Math.max(puncakPanggilan, panggilanBerjalan + 1);
 }
 
-/** Apakah panggilan webhook terakhir yang selesai berakhir 2xx. */
+/** Apakah kiriman sah terakhir yang selesai berakhir sukses (awal proses: dianggap sukses). */
 let hasilTerakhirSukses = true;
 
 function catatDurasi(ms: number, sukses: boolean): void {
   if (!Number.isFinite(ms)) return;
   hasilTerakhirSukses = sukses;
-  if (!pengukuranPertamaDibuang) {
+  if (sukses && contohAwal.length <= CONTOH_MINIMAL) {
+    contohAwal.push({ ms: Math.min(Math.max(ms, 0), ATAP_CONTOH_MS), beban: Math.max(1, puncakPanggilan) });
+  }
+  if (sukses && !pengukuranPertamaDibuang) {
     pengukuranPertamaDibuang = true;
     return;
   }
@@ -682,136 +600,7 @@ function catatDurasi(ms: number, sukses: boolean): void {
     beban: Math.max(1, puncakPanggilan),
   });
   if (cincin.length > CONTOH_DURASI_MAKS) cincin.shift();
-  waktuContohTerbaru = performance.now();
 }
-
-/**
- * Cincin boleh menua — tapi tidak boleh MEMBEKU.
- *
- * Penyerang yang HANYA mengirim jebakan tidak pernah menambah contoh baru (cabang
- * jebakan memang tidak memanggil webhook), jadi tanpa pagar ini isi cincin tetap
- * seperti saat instans baru bangun sementara latensi sebenarnya sudah bergerak.
- * Terukur pada 100 jebakan beruntun di instans dingin, webhook 900 ms: jebakan
- * med 921,0 ms vs kiriman sah med 907,5 ms — selisih 13,5 ms yang konsisten,
- * cukup untuk memisahkan (AUC 0,041).
- *
- * Karena itu: kalau contoh terbaru sudah lebih tua dari JEDA_KALIBRASI_MS, satu
- * kiriman jebakan berikutnya diteruskan lagi untuk memperbarui cincin. Dua hal
- * yang membatasi ongkosnya:
- * 1. Lalu lintas SAH ikut menyegarkan `waktuContohTerbaru`. Di situs yang menerima
- *    lead sungguhan, pagar ini praktis tidak pernah aktif — ia hanya aktif ketika
- *    ada jebakan tapi tidak ada satu pun lead asli selama jendela itu.
- * 2. MAKS_KALIBRASI_JEBAKAN membatasi berapa kali seumur proses cabang jebakan
- *    boleh meneruskan. Sesudah itu cincin memang membeku, dan itu diterima sebagai
- *    batas yang dicatat — bukan dibayar dengan spam tanpa batas ke sink owner.
- *    Atap ini baru benar-benar berlaku sejak G-24: sebelumnya ia diperiksa sesudah
- *    "cincin belum terkalibrasi" sehingga tidak pernah terbaca pada instans yang
- *    webhooknya selalu gagal (25 dari 25 muatan jebakan mendarat di sink; sekarang 5).
- *    Urutan pemeriksaan yang benar dijaga di `sumberJeda` — kuota lebih dulu.
- */
-const JEDA_KALIBRASI_MS = 10_000;
-const MAKS_KALIBRASI_JEBAKAN = 10;
-
-let waktuContohTerbaru = Number.NEGATIVE_INFINITY;
-let jumlahKalibrasiJebakan = 0;
-
-/** Cincin mana yang layak ditiru sekarang, dan seberapa longgar pemilihannya. */
-type Sumber = { cincin: Contoh[]; sukses: boolean; longgar: boolean };
-
-/** Apakah cincin ini punya pengukuran dari beban yang tidak lebih berat dari sekarang. */
-function adaContohSepadan(cincin: Contoh[], beban: number): boolean {
-  for (const contoh of cincin) if (contoh.beban <= beban) return true;
-  return false;
-}
-
-/**
- * Bukti apa yang boleh ditiru cabang jebakan sekarang — atau `null` yang berarti
- * "instans ini tidak punya pengukuran yang mewakili keadaan sekarang", sehingga
- * permintaan ini harus diteruskan lewat jalur kiriman sah (dan sekaligus mengukur).
- *
- * URUTAN PEMERIKSAAN ITU BAGIAN DARI PERBAIKANNYA, bukan gaya penulisan:
- *
- * 1. KUOTA DULU. Versi sebelumnya memeriksa `!cincinTerkalibrasi()` lebih dulu dan
- *    baru sesudahnya kuota, jadi selama cincin belum pernah terisi kuotanya TIDAK
- *    PERNAH DIBACA. Cincin hanya terisi pada 2xx, jadi sink yang selalu gagal =
- *    cincin dingin permanen = penerusan tanpa batas. Terukur pada sink yang selalu
- *    500: 25 dari 25 muatan jebakan (nama, kontak, pesan lengkap) mendarat di sink;
- *    pada sink yang membalas 200 setelah 6 detik (route menyerah di 5 detik): 8 dari
- *    8 mendarat dan sink benar-benar memprosesnya. Kuota di urutan pertama membuat
- *    `MAKS_KALIBRASI_JEBAKAN` benar-benar jadi atap seumur proses seperti yang
- *    dijanjikan blok "HARGA PILIHAN (3)" di atas.
- * 2. CINCIN GAGAL DIPERHITUNGKAN. Kalau webhook tidak pernah sukses, satu-satunya
- *    pengukuran nyata yang ada adalah durasi panggilan yang GAGAL — dan itu justru
- *    yang tepat untuk ditiru, karena pada keadaan itu kiriman sah pun berakhir 502.
- *    Meniru cincin gagal berarti jebakan ikut dibalas 502; tidak ada satu byte pun
- *    tambahan yang dikirim ke sink owner untuk mendapatkannya.
- * 3. BEBAN HARUS SEPADAN. Cincin boleh penuh, tapi kalau seluruh isinya diukur saat
- *    instans sedang dibanjiri, tidak satu pun mewakili kiriman sah yang tiba saat
- *    instans sepi. Ini lubang peracunan cincin, dan angkanya ada di batas 4.
- * 4. CINCIN TIDAK BOLEH MEMBEKU (`JEDA_KALIBRASI_MS`, alasan di atas).
- *
- * Ketika kuota SUDAH habis, tiga pemeriksaan terakhir dilonggarkan, bukan dibatalkan:
- * meneruskan lagi bukan pilihan (itu spam tanpa batas), jadi yang tersisa adalah
- * memakai bukti seadanya — pengukuran dengan beban paling ringan yang dipunya.
- * Itu tebakan terbaik yang masih berupa angka nyata, dan batasnya dicatat di batas 5.
- */
-function sumberJeda(): Sumber | null {
-  const beban = bebanSekarang();
-  const urut: Array<[Contoh[], boolean]> = hasilTerakhirSukses
-    ? [
-        [contohSukses, true],
-        [contohGagal, false],
-      ]
-    : [
-        [contohGagal, false],
-        [contohSukses, true],
-      ];
-
-  if (jumlahKalibrasiJebakan < MAKS_KALIBRASI_JEBAKAN) {
-    if (performance.now() - waktuContohTerbaru >= JEDA_KALIBRASI_MS) return null;
-    for (const [cincin, sukses] of urut) {
-      if (cincin.length >= CONTOH_MINIMAL && adaContohSepadan(cincin, beban)) {
-        return { cincin, sukses, longgar: false };
-      }
-    }
-    return null;
-  }
-
-  for (const [cincin, sukses] of urut) {
-    if (cincin.length >= CONTOH_MINIMAL) return { cincin, sukses, longgar: true };
-  }
-  for (const [cincin, sukses] of urut) {
-    if (cincin.length > 0) return { cincin, sukses, longgar: true };
-  }
-  return null;
-}
-
-/**
- * Panggilan webhook yang sedang berjalan selagi cincin belum terkalibrasi.
- *
- * Tanpa ini, sekumpulan jebakan yang tiba berbarengan pada instans dingin akan
- * SEMUANYA diteruskan (satu per permintaan). Dengan ini hanya satu yang meneruskan
- * pada satu waktu; sisanya ikut menunggu pengukuran yang sedang berlangsung, lalu
- * membayar sisa waktunya — total tetap ±RTT webhook, tanpa kiriman spam tambahan
- * ke sink owner.
- */
-let kalibrasiBerjalan: Promise<void> | null = null;
-let tandaiKalibrasiSelesai: (() => void) | null = null;
-
-function bukaKalibrasi(): void {
-  if (kalibrasiBerjalan || sumberJeda() !== null) return;
-  kalibrasiBerjalan = new Promise<void>((selesai) => {
-    tandaiKalibrasiSelesai = selesai;
-  });
-}
-
-function tutupKalibrasi(): void {
-  const selesai = tandaiKalibrasiSelesai;
-  tandaiKalibrasiSelesai = null;
-  kalibrasiBerjalan = null;
-  selesai?.();
-}
-
 /**
  * Pecahan acak [0,1) dari CSPRNG, bukan `Math.random()`.
  *
@@ -962,85 +751,73 @@ const KECONDONGAN_BARU = 1.5;
 /**
  * Ambil satu contoh dari cincin, condong ke yang paling baru (KECONDONGAN_BARU).
  *
- * Yang diambil hanya contoh dengan `beban` tidak lebih berat daripada beban saat ini.
- * Di keadaan tenang semua contoh berbeban 1 dan `bebanSekarang()` juga 1, jadi
- * saringan ini TIDAK mengubah apa pun di keadaan mapan. Terukur dengan rig ABBA
- * (counterbalanced) pada versi tanpa hop penjadwal, sebelum → sesudah saringan:
- * AUC 0,431 → 0,416 pada webhook 30 ms (n=300 per kelompok) dan 0,647 → 0,595 pada
- * webhook 900 ms (n=60) — keduanya bergerak MENDEKATI 0,5, bukan menjauh. Yang
- * berubah hanya keadaan setelah banjir: contoh berbeban berat tidak lagi diputar
- * ulang saat instans sudah sepi.
- *
- * `longgar` dipakai ketika kuota kalibrasi habis dan tidak ada contoh sepadan: pakai
- * contoh dengan beban paling ringan yang ada, karena meneruskan lagi bukan pilihan.
+ * Yang diambil hanya contoh dengan `beban` tidak lebih berat daripada beban saat ini; bila
+ * tidak ada, contoh dengan beban PALING RINGAN yang dipunya (tebakan terbaik yang masih angka
+ * nyata — meneruskan jebakan untuk mengukur bukan lagi pilihan sejak G-44). Di keadaan tenang
+ * semua contoh berbeban 1 dan `bebanSekarang()` juga 1, jadi saringan ini tidak mengubah apa
+ * pun di keadaan mapan (terukur dulu dengan rig ABBA: AUC 0,431 → 0,416 pada webhook 30 ms).
  */
-function pilihContoh(sumber: Sumber): number | null {
+function pilihContoh(cincin: Contoh[]): number | null {
+  if (cincin.length === 0) return null;
   const beban = bebanSekarang();
-  let layak = sumber.cincin.filter((contoh) => contoh.beban <= beban);
+  let layak = cincin.filter((contoh) => contoh.beban <= beban);
   if (layak.length === 0) {
-    if (!sumber.longgar) return null;
-    const teringan = Math.min(...sumber.cincin.map((contoh) => contoh.beban));
-    layak = sumber.cincin.filter((contoh) => contoh.beban === teringan);
+    const teringan = Math.min(...cincin.map((contoh) => contoh.beban));
+    layak = cincin.filter((contoh) => contoh.beban === teringan);
   }
   const jumlah = layak.length;
-  if (jumlah === 0) return null;
   const mundur = Math.min(jumlah - 1, Math.floor(-Math.log(1 - acak()) * KECONDONGAN_BARU));
   const ms = layak[jumlah - 1 - mundur]?.ms;
   return Number.isFinite(ms) && (ms as number) >= 0 ? (ms as number) : null;
 }
 
 /**
- * Rencana jeda cabang jebakan: berapa lama menunggu, dan balasan mana yang ditiru.
- * `null` = instans ini belum punya pengukuran yang mewakili keadaan sekarang, jadi
- * permintaannya harus diteruskan (bukan dijeda 0 ms — itu persis oracle yang ditutup).
+ * PRIOR konservatif untuk proses yang belum punya SATU PUN kiriman sah sukses (G-44).
+ *
+ * Log-seragam pada [PRIOR_MIN_MS, PRIOR_MAKS_MS] = [250, 1600] ms. Dasarnya: audit ulang G-19
+ * (2026-09-26) mengukur penerusan email nyata ±60–1600 ms (60 ms = mailpit di host yang sama;
+ * mailbox sungguhan melewati jaringan + STARTTLS + AUTH + DATA, beberapa RTT). Batas bawah
+ * dinaikkan ke 250 ms karena mailbox produksi tidak pernah berada di host yang sama; log-seragam
+ * karena ketidakpastiannya berlipat (skala), bukan tambahan.
+ *
+ * HARGANYA, ditulis terang: prior adalah tebakan. Bila latensi nyata jatuh di luar rentang itu
+ * (mis. SMTP lokal 60 ms), jebakan di proses yang BELUM pernah meneruskan kiriman sah bisa
+ * dibedakan — tapi hanya dengan pembanding dari luar proses ini (sesudah kiriman sah pertama,
+ * `contohAwal` menggantikan prior), dan setiap probe memakan anggaran (G-42). Terukur di rig
+ * mailpit lokal: lihat baris G-44 di docs/checklist.md.
+ * DITOLAK: meneruskan jebakan untuk kalibrasi (M-2, spam ke info@); menahan kiriman sah sampai
+ * lantai yang sama (setiap lead asli di proses dingin membayar detik tambahan).
  */
+const PRIOR_MIN_MS = 250;
+const PRIOR_MAKS_MS = 1_600;
+
+function dariPrior(): number {
+  return PRIOR_MIN_MS * (PRIOR_MAKS_MS / PRIOR_MIN_MS) ** acak();
+}
+
+/** Rencana cabang jebakan: berapa lama menunggu, dan balasan (sukses/gagal) mana yang ditiru. */
 type Rencana = { ms: number; sukses: boolean };
 
-function rencanaJeda(): Rencana | null {
-  const sumber = sumberJeda();
-  if (!sumber) return null;
-  const ms = pilihContoh(sumber);
-  return ms === null ? null : { ms, sukses: sumber.sukses };
+function rencanaJeda(): Rencana {
+  if (!hasilTerakhirSukses) {
+    // M-1: kiriman sah terakhir gagal → tiru GAGAL, walau baru satu contoh. `contohGagal`
+    // tidak pernah kosong di sini (kegagalan selalu dicatat); prior hanya jaring pengaman.
+    return { ms: pilihContoh(contohGagal) ?? dariPrior(), sukses: false };
+  }
+  const ms = pilihContoh(contohSukses.length >= CONTOH_MINIMAL ? contohSukses : contohAwal);
+  return { ms: ms ?? dariPrior(), sukses: true };
 }
 
 /**
- * Cabang jebakan, sisi waktunya saja.
- *
- * `dijeda`   = sudah dijeda selama ±RTT webhook; pemanggil membalas seperti kiriman
- *              sah yang berakhir sama (`sukses` → 200, selain itu → 502). Meniru
- *              balasan GAGAL bukan kelonggaran: pada instans yang webhooknya memang
- *              sedang gagal, 502 itulah yang diterima kiriman sah, jadi membalas 200
- *              di sana justru membuka sumbu status.
- * `teruskan` = instans ini tidak punya pengukuran yang mewakili keadaan sekarang,
- *              jadi permintaan ini HARUS jatuh ke jalur kiriman sah (diteruskan ke
- *              webhook) supaya waktunya identik sekaligus mengukur. Lihat pilihan (3)
- *              di blok besar "Menutup oracle waktu" beserta harganya — dan kuotanya,
- *              yang sekarang benar-benar ditegakkan (`sumberJeda`, urutan 1).
+ * Cabang jebakan, sisi waktu & statusnya. Tidak pernah meneruskan apa pun (G-44).
+ * Pemanggil membalas seperti kiriman sah yang berakhir sama (`sukses` → 200, selain itu → 502).
  */
-type HasilJeda = { jenis: "dijeda"; sukses: boolean } | { jenis: "teruskan" };
-
-async function jedaSeolahDiteruskan(): Promise<HasilJeda> {
-  // Titik tempel: padanan persis dari titik tepat sebelum `fetch(webhook)` di
-  // cabang kiriman sah. Semua tenggat di bawah dihitung dari sini.
+async function jedaSeolahDiteruskan(): Promise<{ sukses: boolean }> {
+  // Titik tempel: padanan persis dari titik tepat sebelum penerusan di cabang kiriman sah.
   const titik = performance.now();
-
-  const langsung = rencanaJeda();
-  if (langsung) {
-    await tidurSampai(titik + langsung.ms);
-    return { jenis: "dijeda", sukses: langsung.sukses };
-  }
-
-  const kalibrasi = kalibrasiBerjalan;
-  // tidak ada yang sedang mengukur → giliran permintaan ini
-  if (!kalibrasi) return { jenis: "teruskan" };
-
-  // Ada pengukuran yang sedang berjalan: ikut menunggunya selesai, lalu bayar
-  // sisa waktunya. Total tetap ±selama kiriman sah, tanpa meneruskan apa pun.
-  await kalibrasi;
-  const sesudah = rencanaJeda();
-  if (!sesudah) return { jenis: "teruskan" }; // masih kurang → ukur lagi
-  await tidurSampai(titik + sesudah.ms);
-  return { jenis: "dijeda", sukses: sesudah.sukses };
+  const rencana = rencanaJeda();
+  await tidurSampai(titik + rencana.ms);
+  return { sukses: rencana.sukses };
 }
 
 // ————————————————————————————————————————————————————————————————
@@ -1204,6 +981,21 @@ function balas(
 }
 
 const PESAN_GAGAL = "Gagal mengirim. Silakan hubungi kami lewat WhatsApp.";
+const PESAN_TIDAK_TERSEDIA = "Form sedang tidak tersedia. Silakan hubungi kami lewat WhatsApp.";
+
+/** Anggaran kirim situs + per IP (G-42), satu per proses. Angka: `ANGGARAN_KIRIM` di ./batas.ts. */
+const anggaran = buatAnggaran(ANGGARAN_KIRIM);
+
+/** Konfigurasi Turnstile untuk permintaan ini, atau `null` bila mati (kedua env kosong). */
+function konfigurasiTurnstile(): { berkasRahasia: string; hostSitus: string } | null {
+  try {
+    const env = getEnv();
+    if (!turnstileAktif(env)) return null;
+    return { berkasRahasia: env.TURNSTILE_SECRET_FILE, hostSitus: new URL(env.SITE_URL).hostname };
+  } catch {
+    return null; // env tak valid sudah menghentikan boot (instrumentation.ts)
+  }
+}
 
 export async function POST(req: NextRequest) {
   // Dua pagar bentuk permintaan didahulukan: keduanya hanya membaca header, tidak
@@ -1228,7 +1020,8 @@ export async function POST(req: NextRequest) {
     return balas({ error: "Format tidak valid." }, 415);
   }
 
-  const kuota = konsumsiKuota(identitasKlien(req));
+  const identitas = identitasKlien(req);
+  const kuota = konsumsiKuota(identitas);
   if (!kuota.boleh) {
     return balas({ error: "Terlalu banyak percobaan. Coba lagi sebentar lagi." }, 429, {
       "retry-after": String(kuota.tungguDetik),
@@ -1271,27 +1064,42 @@ export async function POST(req: NextRequest) {
     //
     // Diperiksa SEBELUM cabang honeypot supaya bot tidak bisa membedakan jebakan
     // dari kiriman biasa hanya dengan melihat 503 vs 200.
-    return balas({ error: "Form sedang tidak tersedia. Silakan hubungi kami lewat WhatsApp." }, 503);
+    return balas({ error: PESAN_TIDAK_TERSEDIA }, 503);
+  }
+
+  // Turnstile (G-43), bila aktif. Diperiksa untuk kiriman sah DAN jebakan dengan kode yang sama,
+  // SEBELUM anggaran: token gagal tidak pernah memakan jatah surel. Token gagal → 403 generik,
+  // SAMA PERSIS dengan Origin asing dan "terlalu cepat" — satu pintu "ditolak" tanpa status
+  // khusus yang memberi tahu bot bahwa yang salah hanya tokennya.
+  // Siteverify tak terjangkau → DILOLOSKAN (fail-open, ADR G-43): pengunjung sah tidak dihukum
+  // karena gangguan Cloudflare, dan anggaran G-42 tetap memagari jumlah surel.
+  const turnstile = konfigurasiTurnstile();
+  if (turnstile) {
+    const hasil = await periksaTurnstile(parsed.data["cf-turnstile-response"], {
+      ...turnstile,
+      aksi: AKSI_PEMERIKSAAN,
+    });
+    if (hasil === "ditolak") return balas({ error: PESAN_GAGAL }, 403);
+    if (hasil === "galat-konfigurasi") return balas({ error: PESAN_TIDAK_TERSEDIA }, 503);
+  }
+
+  // Anggaran kirim (G-42, menutup H-1). Dikonsumsi di SATU titik untuk kiriman sah dan jebakan,
+  // sebelum cabangnya berpisah — jadi KAPAN atap tersandung tidak membedakan keduanya, dan
+  // balasannya (503, body sama dengan "tanpa kanal") keluar dari baris yang sama.
+  const kunciIp = identitas.kunci.startsWith("ip:") ? identitas.kunci : null;
+  if (!anggaran.coba(kunciIp)) {
+    console.error("[lead] anggaran kirim habis (situs/jam atau IP/hari)");
+    return balas({ error: PESAN_TIDAK_TERSEDIA }, 503);
   }
 
   if (honeypotTerisi(parsed.data.website)) {
-    // Terperangkap: balas persis seperti kiriman sah yang berakhir sama, tapi TIDAK
-    // meneruskan apa pun ke webhook. Jedanya menyamakan sumbu terakhir yang masih
-    // membocorkan jebakan ini — waktu (G-19a, lihat blok penjelasan di atas).
+    // Terperangkap: TIDAK PERNAH diteruskan (nol email, nol webhook — G-44). Waktu dan status
+    // ditiru dari model penerusan nyata (blok "Menutup oracle waktu & status" di atas).
+    // Body, status, dan header harus tetap identik dengan cabang kiriman sah di bawah.
     const jeda = await jedaSeolahDiteruskan();
-    if (jeda.jenis === "dijeda") {
-      // Body, status, dan header dua cabang ini harus tetap identik dengan cabang
-      // kiriman sah di bawah. Jangan menambahkan field pembeda apa pun di sini.
-      return jeda.sukses ? balas({ ok: true }, 200) : balas({ error: PESAN_GAGAL }, 502);
-    }
-    // `teruskan` = instans ini belum punya pengukuran yang mewakili keadaan sekarang.
-    // Tidak ada jeda yang bisa dikarang tanpa membocorkan jebakannya, jadi permintaan
-    // ini SENGAJA jatuh ke jalur di bawah apa adanya: diteruskan, diukur, dan sesudah
-    // itu cincin ikut segar. Atapnya MAKS_KALIBRASI_JEBAKAN, ditegakkan di `sumberJeda`.
-    jumlahKalibrasiJebakan += 1;
+    return jeda.sukses ? balas({ ok: true }, 200) : balas({ error: PESAN_GAGAL }, 502);
   }
 
-  bukaKalibrasi();
   mulaiPanggilanWebhook();
   const mulaiWebhook = performance.now();
   try {
@@ -1334,10 +1142,8 @@ export async function POST(req: NextRequest) {
     catatDurasi(performance.now() - mulaiWebhook, sukses);
     return balasan;
   } finally {
-    // Urutan wajib: `catatDurasi` sudah jalan (jadi jebakan yang menunggu bangun ke
-    // cincin yang sudah diperbarui) dan `puncakPanggilan` belum dinolkan (jadi
+    // Urutan wajib: `catatDurasi` sudah jalan dan `puncakPanggilan` belum dinolkan (jadi
     // pengukuran barusan tertandai beban yang benar).
     selesaiPanggilanWebhook();
-    tutupKalibrasi();
   }
 }

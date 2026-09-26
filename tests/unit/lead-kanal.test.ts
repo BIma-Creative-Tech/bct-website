@@ -1,10 +1,14 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Kanal penerusan `/api/lead` (G-41): email SMTP primer + webhook opsional.
  * Mailer di-mock (lib/mailer.ts diuji terpisah di mailer.test.ts), `fetch` di-stub.
- * Tiap uji memuat ulang modul route → rate limit, cincin waktu jebakan, dan cache env segar.
+ * Tiap uji memuat ulang modul route → rate limit, anggaran, cincin waktu jebakan, cache env,
+ * dan cache token Turnstile segar.
  */
 vi.mock("server-only", () => ({}));
 const m = vi.hoisted(() => ({ kirimEmailLead: vi.fn(async () => {}) }));
@@ -166,7 +170,7 @@ describe("POST /api/lead — kanal penerusan", () => {
   });
 });
 
-describe("POST /api/lead — honeypot tidak berubah (G-19), untuk kanal apa pun", () => {
+describe("POST /api/lead — jebakan TIDAK PERNAH diteruskan (G-44), untuk kanal apa pun", () => {
   it("tanpa kanal: jebakan → 503, sama dengan kiriman sah (dicek sebelum jebakan)", async () => {
     const POST = await muat({});
     const sah = await ringkas(await kirim(POST));
@@ -178,9 +182,9 @@ describe("POST /api/lead — honeypot tidak berubah (G-19), untuk kanal apa pun"
     ["email", EMAIL_AKTIF],
     ["webhook", WEBHOOK],
     ["email+webhook", { ...EMAIL_AKTIF, ...WEBHOOK }],
-  ])("%s: sesudah kalibrasi, jebakan dibalas identik (200 {ok:true}) TANPA kiriman", async (_n, env) => {
+  ])("%s: cincin hangat → jebakan dibalas identik (200 {ok:true}) TANPA kiriman", async (_n, env) => {
     const POST = await muat(env);
-    // 1 pengukuran pertama dibuang + CONTOH_MINIMAL (4) → cincin sukses terkalibrasi.
+    // 1 pengukuran pertama dibuang + CONTOH_MINIMAL (4) → cincin sukses siap.
     for (let i = 0; i < 5; i++) expect((await kirim(POST)).status).toBe(200);
     const sah = await ringkas(await kirim(POST));
     const emailSebelum = m.kirimEmailLead.mock.calls.length;
@@ -191,24 +195,188 @@ describe("POST /api/lead — honeypot tidak berubah (G-19), untuk kanal apa pun"
     expect(fetchPalsu.mock.calls.length).toBe(fetchSebelum);
   });
 
-  it("email gagal terus: jebakan meniru 502 dari cincin gagal, tanpa kiriman", async () => {
+  it("instans dingin: jebakan TIDAK diteruskan (kalibrasi dicabut), jeda dari prior 250–1600 ms", async () => {
+    const POST = await muat({ ...EMAIL_AKTIF, ...WEBHOOK });
+    for (let i = 0; i < 3; i++) {
+      const mulai = performance.now();
+      const res = await ringkas(await kirim(POST, { ...LEAD, website: "x" }));
+      const lama = performance.now() - mulai;
+      expect(res).toEqual({ status: 200, body: { ok: true }, cc: "no-store" });
+      expect(lama).toBeGreaterThanOrEqual(240);
+      expect(lama).toBeLessThan(1_900);
+    }
+    expect(m.kirimEmailLead).not.toHaveBeenCalled();
+    expect(fetchPalsu).not.toHaveBeenCalled();
+  }, 15_000);
+
+  it("M-1: SATU kegagalan nyata (bahkan yang pertama) → jebakan meniru 502, tanpa kiriman", async () => {
     const POST = await muat(EMAIL_AKTIF);
-    m.kirimEmailLead.mockRejectedValue(new Error("x"));
-    for (let i = 0; i < 5; i++) expect((await kirim(POST)).status).toBe(502);
+    m.kirimEmailLead.mockRejectedValueOnce(new Error("x"));
     const sah = await ringkas(await kirim(POST));
-    const sebelum = m.kirimEmailLead.mock.calls.length;
+    expect(sah.status).toBe(502);
     const jebakan = await ringkas(await kirim(POST, { ...LEAD, website: "x" }));
     expect(jebakan).toEqual(sah);
-    expect(jebakan.status).toBe(502);
-    expect(m.kirimEmailLead.mock.calls.length).toBe(sebelum);
+    expect(m.kirimEmailLead).toHaveBeenCalledTimes(1);
   });
 
-  it("instans dingin: jebakan diteruskan lewat jalur yang SAMA (kalibrasi G-19), kuota tetap berlaku", async () => {
+  it("M-1: cincin sukses sudah panas lalu SMTP rusak → jebakan ikut 502 sejak kegagalan pertama", async () => {
     const POST = await muat(EMAIL_AKTIF);
-    const status: number[] = [];
-    for (let i = 0; i < 15; i++) status.push((await kirim(POST, { ...LEAD, website: "x" })).status);
-    expect(status.every((s) => s === 200)).toBe(true);
-    // Atap MAKS_KALIBRASI_JEBAKAN (10) seumur proses — tidak pernah tanpa batas.
-    expect(m.kirimEmailLead.mock.calls.length).toBeLessThanOrEqual(10);
+    // 5 + 1 + 1 + 1 = 8 = ledakan anggaran (G-42); uji tidak boleh melewatinya.
+    for (let i = 0; i < 5; i++) expect((await kirim(POST)).status).toBe(200);
+    m.kirimEmailLead.mockRejectedValueOnce(new Error("x"));
+    expect((await kirim(POST)).status).toBe(502);
+    const n = m.kirimEmailLead.mock.calls.length;
+    expect((await kirim(POST, { ...LEAD, website: "x" })).status).toBe(502);
+    expect(m.kirimEmailLead.mock.calls.length).toBe(n);
+    expect((await kirim(POST)).status).toBe(200); // SMTP pulih → jebakan kembali meniru sukses
+  });
+
+  it("webhook gagal: jebakan meniru 502, tanpa fetch", async () => {
+    const POST = await muat(WEBHOOK);
+    fetchPalsu.mockResolvedValueOnce(new Response(null, { status: 500 }));
+    expect((await kirim(POST)).status).toBe(502);
+    expect((await kirim(POST, { ...LEAD, website: "x" })).status).toBe(502);
+    expect(fetchPalsu).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("POST /api/lead — anggaran kirim (G-42, H-1)", () => {
+  it("atap situs: kiriman sah DAN jebakan memakan jatah yang sama; sesudah habis keduanya 503 identik", async () => {
+    const POST = await muat(EMAIL_AKTIF);
+    for (let i = 0; i < 5; i++) expect((await kirim(POST)).status).toBe(200); // hangat, 5 token
+    for (let i = 0; i < 3; i++) expect((await kirim(POST, { ...LEAD, website: "x" })).status).toBe(200); // 3 token
+    const sah = await ringkas(await kirim(POST));
+    const jebakan = await ringkas(await kirim(POST, { ...LEAD, website: "x" }));
+    expect(sah).toEqual({
+      status: 503,
+      body: { error: "Form sedang tidak tersedia. Silakan hubungi kami lewat WhatsApp." },
+      cc: "no-store",
+    });
+    expect(jebakan).toEqual(sah);
+    expect(m.kirimEmailLead).toHaveBeenCalledTimes(5); // hanya kiriman sah yang jadi surel
+  });
+
+  it("atap IP: 3 per hari per IP (sah + jebakan dihitung), IP lain tetap bisa", async () => {
+    const POST = await muat(EMAIL_AKTIF);
+    const dariIp = (ip: string, body: Record<string, unknown> = LEAD) =>
+      POST(
+        new NextRequest("http://0.0.0.0:3000/api/lead", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            host: "bimacreative.tech",
+            origin: "https://bimacreative.tech",
+            "x-forwarded-for": ip,
+          },
+          body: JSON.stringify(body),
+        }),
+      );
+    // Anggaran situs (ledakan 8) tidak ikut campur: total kiriman lolos di uji ini hanya 4.
+    expect((await dariIp("203.0.113.50")).status).toBe(200);
+    expect((await dariIp("203.0.113.50", { ...LEAD, website: "x" })).status).toBe(200); // prior
+    expect((await dariIp("203.0.113.50")).status).toBe(200);
+    const ke4 = await ringkas(await dariIp("203.0.113.50"));
+    expect(ke4.status).toBe(503);
+    expect(await ringkas(await dariIp("203.0.113.50", { ...LEAD, website: "x" }))).toEqual(ke4);
+    expect((await dariIp("203.0.113.51")).status).toBe(200);
+    expect(m.kirimEmailLead).toHaveBeenCalledTimes(3);
+  }, 10_000);
+
+  it("tanpa kanal (503) tidak memakan anggaran", async () => {
+    const POST = await muat({});
+    for (let i = 0; i < 12; i++) expect((await kirim(POST)).status).toBe(503);
+    expect(m.kirimEmailLead).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/lead — Turnstile (G-43)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "lead-ts-"));
+  const berkasRahasia = (isi: string) => {
+    const p = join(dir, `${isi.slice(0, 2)}-${Math.random().toString(36).slice(2)}`);
+    writeFileSync(p, isi);
+    return p;
+  };
+  const tsEnv = (secret: string) => ({
+    ...EMAIL_AKTIF,
+    TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+    TURNSTILE_SECRET_FILE: berkasRahasia(secret),
+  });
+  /** fetch: siteverify ditiru, sisanya (webhook) 200. */
+  function pasangSiteverify(jawab: (secret: string, token: string) => Record<string, unknown> | Error) {
+    fetchPalsu.mockImplementation(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes("/turnstile/v0/siteverify")) {
+        const { secret, response } = JSON.parse(String(init?.body));
+        const j = jawab(secret, response);
+        if (j instanceof Error) throw j;
+        return new Response(JSON.stringify(j), { status: 200 });
+      }
+      return new Response("ok", { status: 200 });
+    });
+  }
+  let tok = 0;
+  const denganToken = (extra: Record<string, unknown> = {}) => ({
+    ...LEAD,
+    "cf-turnstile-response": `tok-${++tok}`,
+    ...extra,
+  });
+
+  it("kunci uji 1x (selalu lolos) + token → 200 dan surel terkirim", async () => {
+    const POST = await muat(tsEnv("1x0000000000000000000000000000000AA"));
+    pasangSiteverify((s) => (s.startsWith("1x") ? { success: true, hostname: "example.com" } : { success: false }));
+    expect((await kirim(POST, denganToken())).status).toBe(200);
+    expect(m.kirimEmailLead).toHaveBeenCalledTimes(1);
+  });
+
+  it("token absen / kunci uji 2x (selalu gagal) → 403 generik, SAMA dengan Origin asing; tanpa surel; tanpa memakan anggaran", async () => {
+    const POST = await muat(tsEnv("2x0000000000000000000000000000000AA"));
+    pasangSiteverify(() => ({ success: false, "error-codes": ["invalid-input-response"] }));
+    const tanpa = await ringkas(await kirim(POST));
+    const gagal = await ringkas(await kirim(POST, denganToken()));
+    const jebakanGagal = await ringkas(await kirim(POST, denganToken({ website: "x" })));
+    expect(tanpa).toEqual({
+      status: 403,
+      body: { error: "Gagal mengirim. Silakan hubungi kami lewat WhatsApp." },
+      cc: "no-store",
+    });
+    expect(gagal).toEqual(tanpa);
+    expect(jebakanGagal).toEqual(tanpa);
+    expect(m.kirimEmailLead).not.toHaveBeenCalled();
+  });
+
+  it("penolakan Turnstile tidak memakan anggaran: 20 gagal lalu 8 lolos berturut-turut", async () => {
+    const POST = await muat(tsEnv("0x4AAAAAAAprodpalsu"));
+    pasangSiteverify((_s, t) =>
+      t.endsWith("-ok") ? { success: true, hostname: "bimacreative.tech", action: "kontak" } : { success: false },
+    );
+    for (let i = 0; i < 20; i++) expect((await kirim(POST, denganToken())).status).toBe(403);
+    for (let i = 0; i < 8; i++) {
+      expect((await kirim(POST, { ...LEAD, "cf-turnstile-response": `ok-${i}-ok` })).status).toBe(200);
+    }
+    expect((await kirim(POST, { ...LEAD, "cf-turnstile-response": "ok-9-ok" })).status).toBe(503);
+  });
+
+  it("kunci produksi: hostname lain / action lain → 403", async () => {
+    const POST = await muat(tsEnv("0x4AAAAAAAprodpalsu"));
+    pasangSiteverify((_s, t) =>
+      t === "tok-host"
+        ? { success: true, hostname: "evil.example", action: "kontak" }
+        : { success: true, hostname: "bimacreative.tech", action: "masuk" },
+    );
+    expect((await kirim(POST, { ...LEAD, "cf-turnstile-response": "tok-host" })).status).toBe(403);
+    expect((await kirim(POST, { ...LEAD, "cf-turnstile-response": "tok-aksi" })).status).toBe(403);
+    expect(m.kirimEmailLead).not.toHaveBeenCalled();
+  });
+
+  it("siteverify tak terjangkau → fail-open (200), token tetap wajib ada", async () => {
+    const POST = await muat(tsEnv("0x4AAAAAAAprodpalsu"));
+    pasangSiteverify(() => new TypeError("fetch failed"));
+    expect((await kirim(POST, denganToken())).status).toBe(200);
+    expect((await kirim(POST)).status).toBe(403);
+  });
+
+  it("Turnstile mati (env kosong): token diabaikan, tidak ada panggilan siteverify", async () => {
+    const POST = await muat(EMAIL_AKTIF);
+    expect((await kirim(POST, denganToken())).status).toBe(200);
+    expect(fetchPalsu).not.toHaveBeenCalled();
   });
 });
