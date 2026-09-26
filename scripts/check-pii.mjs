@@ -8,7 +8,9 @@
  *   - `.next/static/**` (bundel JS/CSS klien), dan
  *   - prerender `.next/server/app/**` berekstensi .html/.rsc/.body/.meta/.segment.rsc
  *     (menutup batasan (a) versi lama yang hanya memindai .next/static).
- * Nilainya dibaca dari `content/site.ts` saat skrip berjalan (TIDAK ditulis literal di
+ * G-41 (2026-09-26): alamat penerima email lead `PENERIMA_LEAD` (lib/lead-recipient.ts,
+ * server-only) ikut dilarang — alamat BCT pun tidak boleh terbit ke klien (ADR 2026-08-24).
+ * Nilainya dibaca dari `content/site.ts` / `lib/lead-recipient.ts` saat skrip berjalan (TIDAK ditulis literal di
  * repo), dan TIDAK PERNAH dicetak ke log — hanya nama field + path berkas.
  * Fail-closed: berkas hilang, nilai email tak terbaca, atau nol berkas terpindai → exit 1.
  * Jalankan setelah `npm run build`:  node scripts/check-pii.mjs
@@ -40,6 +42,16 @@ const dicari = [["site.email", email]];
 const lokasi = nilai("location");
 if (lokasi === undefined) gagal("site.location tidak terbaca");
 if (lokasi.trim().length >= 3) dicari.push(["site.location", lokasi]);
+
+let sumberPenerima;
+try {
+  sumberPenerima = readFileSync("lib/lead-recipient.ts", "utf8");
+} catch {
+  gagal("lib/lead-recipient.ts tidak terbaca");
+}
+const penerima = sumberPenerima.match(/^export const PENERIMA_LEAD = "([^"]+)";$/m)?.[1];
+if (!penerima || !penerima.includes("@")) gagal("PENERIMA_LEAD tidak terbaca (guard tidak boleh lolos diam-diam)");
+dicari.push(["PENERIMA_LEAD", penerima]);
 
 function* telusuri(dir) {
   for (const nama of readdirSync(dir)) {

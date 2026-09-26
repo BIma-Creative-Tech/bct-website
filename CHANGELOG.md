@@ -5,6 +5,15 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ## [Unreleased]
 
+### Changed
+
+- G-41 (2026-09-26, keputusan owner): form `/kontak` → `POST /api/lead` kini meneruskan lead lewat **email SMTP (kanal primer)** ke `info@bimacreative.tech` dan webhook `LEAD_WEBHOOK_URL` sebagai kanal tambahan opsional, paralel. Email aktif → 200 hanya bila email terkirim (webhook gagal dicatat, tidak fatal); hanya webhook → perilaku lama; tanpa kanal → 503 (ADR 2026-08-25 tetap). Semua pagar lama (zod, honeypot + penyamaran waktu G-19, Origin/Host, `application/json`, rate limit, `BATAS_ISIAN`, kutip spreadsheet untuk webhook) tidak diubah; cincin waktu jebakan kini mengukur penerusan seluruhnya. Menggantikan G-17 ("`LEAD_WEBHOOK_URL` WAJIB").
+- G-41: `lib/env.ts` mengadopsi kontrak web-starter `CONTACT_ENABLED` + `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_FROM_ADDRESS`/`SMTP_PASSWORD_FILE` (validasi saat boot → exit 1). `scripts/check-pii.mjs` ikut melarang `PENERIMA_LEAD`. `.env.example`, README §Env, CLAUDE.md, SECURITY.md, komentar Dockerfile diperbarui.
+
+### Added
+
+- G-41: `lib/mailer.ts` (port web-starter: nodemailer, password dari file saat kirim, TLS wajib 465/STARTTLS, teks polos, subjek tanpa karakter kontrol, Reply-To hanya email sah, tenggat total 10 s) dan `lib/lead-recipient.ts` (`import "server-only"`). Dependency runtime `nodemailer@10.0.10` + `server-only@0.0.1` (integritas lock identik web-starter). Uji `tests/unit/{env-contact,mailer,lead-kanal}.test.ts` (42 uji).
+
 ### Removed
 
 - G-35: `.github/workflows/release.yml` dihapus — rilis tag `vX.Y.Z` kini job `image` di `ci.yml` yang hanya push setelah semua pemeriksaan + Trivy + smoke test hijau (menutup MEDIUM audit G-15 putaran 1: release lama push ke GHCR tanpa gerbang, cek CHANGELOG-nya berjalan sesudah push). Tag `latest` tidak lagi diterbitkan.

@@ -64,7 +64,7 @@ Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token dide
 | `/studi-kasus` | KOMDIGI e-Telekomunikasi + retail | belum (W2-03) — tertahan menunggu fakta proyek dari owner |
 | `/tentang` | Sejarah BCT, cara kerja, tiga mesin | hidup (W2-04) |
 | `/insight` | Blog/artikel pendek (MDX) | belum (W2-06) |
-| `/kontak` | Form lead + WA | hidup (W2-05); form membalas 503 sampai `LEAD_WEBHOOK_URL` diisi (G-17) |
+| `/kontak` | Form lead + WA | hidup (W2-05); `POST /api/lead` → email SMTP ke `info@` (kanal primer, `CONTACT_ENABLED=true` + `SMTP_*`) + webhook opsional `LEAD_WEBHOOK_URL`; tanpa kanal → 503 (G-41, menggantikan G-17) |
 
 **Rute hidup dibaca dari `content/rute.ts`** (`RUTE_HIDUP` + `ruteHidup()`/`saringTautan()`/`tautanHidup()`) — satu-satunya sumber; nav, footer, CTA, `app/not-found.tsx`, dan `app/sitemap.ts` semuanya memakainya, jadi menghidupkan `/studi-kasus` atau `/insight` cukup satu baris di berkas itu. Jangan membuat daftar rute kedua. Batas yang perlu diketahui: aturan ini belum dipaksakan mesin (G-23) — tautan literal ke rute mati masih lolos lint/tsc/build.
 
@@ -73,7 +73,7 @@ Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token dide
 ## Backlog sprint (kerjakan berurutan)
 
 - **W1 — Struktur & copy:** finalisasi copywriting semua halaman di `content/`, layout + nav + footer, halaman beranda utuh.
-- **W2 — Semua halaman:** produk ×3, pricing, studi kasus, tentang, kontak (form → `/api/lead` → webhook + link WA; **bukan** `mailto:` — ADR 2026-08-24 melarang alamat email terbit ke HTML), insight (MDX list + detail).
+- **W2 — Semua halaman:** produk ×3, pricing, studi kasus, tentang, kontak (form → `/api/lead` → email SMTP primer + webhook opsional (G-41) + link WA; **bukan** `mailto:` — ADR 2026-08-24 melarang alamat email terbit ke HTML), insight (MDX list + detail).
 - **W3 — Poles & rilis:** SEO (metadata per halaman, sitemap.xml, robots, OG image), Umami, aksesibilitas, uji mobile, deploy VPS (Traefik) + domain.
 
 **Definition of Done situs:** live di domain sendiri · semua halaman konten nyata · form & tombol WA teruji · Lighthouse mobile ≥ 90 semua kategori · rate card PDF bisa diunduh · analytics mencatat.

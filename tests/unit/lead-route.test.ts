@@ -2,9 +2,12 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/lead/route";
 
+// `import "server-only"` (lib/lead-recipient.ts, lib/mailer.ts) melempar di luar bundler Next.
+vi.mock("server-only", () => ({}));
+
 /**
  * Pagar Origin/Host dan identitas rate limit `/api/lead` (tanpa menulis ulang route).
- * LEAD_WEBHOOK_URL tidak diset → kiriman sah berakhir 503 (ADR 2026-08-25), jadi tidak
+ * LEAD_WEBHOOK_URL tidak diset dan CONTACT_ENABLED mati → kiriman sah berakhir 503 (ADR 2026-08-25), jadi tidak
  * ada panggilan jaringan. State rate limit tinggal di modul → tiap uji memakai IP sendiri.
  */
 const BODY_SAH = JSON.stringify({
@@ -26,6 +29,8 @@ function kirim(headers: Record<string, string>, body = BODY_SAH, url = "http://0
 }
 
 beforeEach(() => {
+  vi.stubEnv("SITE_URL", "https://bimacreative.tech");
+  vi.stubEnv("CONTACT_ENABLED", "");
   vi.stubEnv("LEAD_WEBHOOK_URL", "");
   vi.stubEnv("VERCEL", "");
 });

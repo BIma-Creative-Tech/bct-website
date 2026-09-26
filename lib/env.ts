@@ -1,25 +1,60 @@
 import { z } from "zod";
 
 /**
- * Env runtime — KONTRAK container (templates/web-client di repo infra hanya meneruskan
- * `SITE_URL` + `CONTACT_ENABLED`; lihat README §Deploy). Pola sama dengan web-starter
- * (`src/lib/env.ts`), dipangkas ke yang dipakai situs ini:
+ * Env runtime — KONTRAK container. Pola dan nama SAMA dengan web-starter (`src/lib/env.ts`) dan
+ * template infra `templates/web-client/docker-compose.contact.yml` (ADR 2026-09-26 "Form kontak:
+ * email SMTP primer + webhook opsional", G-41):
  *   SITE_URL (wajib) — URL publik kanonik, sumber metadataBase/canonical/og:url/sitemap/robots.
+ *   CONTACT_ENABLED (default false) — `true` → kanal EMAIL /api/lead aktif; SMTP_HOST,
+ *     SMTP_USER, SMTP_FROM_ADDRESS, SMTP_PASSWORD_FILE wajib; SMTP_PORT default 587
+ *     (465 = TLS implisit, lainnya STARTTLS wajib — ditegakkan di lib/mailer.ts).
+ *   SMTP_PASSWORD_FILE = PATH file secret (dibaca saat kirim), bukan password.
  *
  * Divalidasi saat boot (instrumentation.ts) → container exit 1 bila salah. Dibaca lazy
- * (getEnv) sehingga `next build` TIDAK membutuhkan SITE_URL: semua halaman dirender
+ * (getEnv) sehingga `next build` TIDAK membutuhkan env runtime: semua halaman dirender
  * dinamis per request (nonce CSP), jadi nilainya baru dibaca saat request.
  *
- * `LEAD_WEBHOOK_URL` sengaja TIDAK divalidasi di sini: kosong = /api/lead membalas 503
- * (ADR 2026-08-25), dan pengerasan tujuannya (wajib https) masih keputusan owner.
+ * Beda dari web-starter (disengaja): CONTACT_ENABLED=false TIDAK mematikan /api/lead — ia hanya
+ * mematikan kanal email. Kanal webhook `LEAD_WEBHOOK_URL` tetap opsional dan sengaja TIDAK
+ * divalidasi di sini (pengerasan tujuannya — wajib https — masih keputusan owner). Tidak ada
+ * kanal sama sekali → /api/lead 503 (ADR 2026-08-25).
  * Pesan error hanya menyebut NAMA variabel, tidak pernah nilainya.
  */
-export const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("production"),
-  SITE_URL: z
-    .url({ protocol: /^https?$/, message: "harus URL http(s), mis. https://bimacreative.tech" })
-    .transform((v) => v.replace(/\/+$/, "")),
-});
+const booleanString = z
+  .enum(["true", "false", "1", "0", ""], { message: "harus true/false" })
+  .optional()
+  .transform((v) => v === "true" || v === "1");
+
+const optionalString = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v ? v : undefined));
+
+export const envSchema = z
+  .object({
+    NODE_ENV: z.enum(["development", "test", "production"]).default("production"),
+    SITE_URL: z
+      .url({ protocol: /^https?$/, message: "harus URL http(s), mis. https://bimacreative.tech" })
+      .transform((v) => v.replace(/\/+$/, "")),
+    CONTACT_ENABLED: booleanString,
+    SMTP_HOST: optionalString,
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+    SMTP_USER: optionalString,
+    SMTP_FROM_ADDRESS: z.email({ message: "harus alamat email" }).optional(),
+    SMTP_PASSWORD_FILE: optionalString,
+  })
+  .superRefine((env, ctx) => {
+    if (!env.CONTACT_ENABLED) return;
+    for (const key of ["SMTP_HOST", "SMTP_USER", "SMTP_FROM_ADDRESS", "SMTP_PASSWORD_FILE"] as const) {
+      if (!env[key]) {
+        ctx.addIssue({ code: "custom", path: [key], message: "wajib bila CONTACT_ENABLED=true" });
+      }
+    }
+    if (env.SMTP_PASSWORD_FILE && !env.SMTP_PASSWORD_FILE.startsWith("/")) {
+      ctx.addIssue({ code: "custom", path: ["SMTP_PASSWORD_FILE"], message: "harus path absolut" });
+    }
+  });
 
 export type Env = z.infer<typeof envSchema>;
 

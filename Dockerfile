@@ -6,7 +6,8 @@
 # KONTRAK runtime (dipakai templates/web-client di repo infra):
 #   port 3000 (HOSTNAME=0.0.0.0) · GET /api/health → 200 {"status":"ok"} · uid:gid 1001:1001 ·
 #   rootfs read-only; hanya /tmp dan /app/.next/cache yang writable (tmpfs) ·
-#   env: SITE_URL (wajib), LEAD_WEBHOOK_URL (opsional; kosong → /api/lead 503).
+#   env: SITE_URL (wajib); CONTACT_ENABLED + SMTP_HOST/PORT/USER/FROM_ADDRESS/PASSWORD_FILE (kanal email
+#   /api/lead, kontrak web-starter); LEAD_WEBHOOK_URL (opsional). Tanpa kanal → /api/lead 503.
 #   Container TIDAK boleh diberi port publik: IP klien rate limit dipercaya dari Traefik.
 ARG NODE_IMAGE=node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
 

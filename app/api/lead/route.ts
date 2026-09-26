@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { clientIpFrom } from "@/lib/client-ip";
+import { getEnv, type Env } from "@/lib/env";
+import { PENERIMA_LEAD } from "@/lib/lead-recipient";
+import { kirimEmailLead } from "@/lib/mailer";
 import { BATAS_ISIAN } from "./batas";
 
 /**
@@ -8,7 +11,18 @@ import { BATAS_ISIAN } from "./batas";
  *
  * Prinsip yang dijaga:
  * - Validasi zod ketat, hanya field yang dibutuhkan (UU PDP: data minimal).
- * - Tidak menyimpan apa pun; hanya meneruskan ke LEAD_WEBHOOK_URL.
+ * - Tidak menyimpan apa pun; hanya MENERUSKAN (ADR 2026-09-26 "Form kontak: email SMTP primer +
+ *   webhook opsional", G-41) ke:
+ *     1. EMAIL via SMTP (kanal PRIMER) bila CONTACT_ENABLED=true → PENERIMA_LEAD
+ *        (lib/lead-recipient.ts, server-only); dan/atau
+ *     2. LEAD_WEBHOOK_URL (kanal TAMBAHAN, opsional) — kode lama, apa adanya.
+ *   Aturan sukses (lihat `teruskanLead`): email aktif → sukses HANYA bila email terkirim
+ *   (webhook gagal dicatat di log, tidak fatal); hanya webhook → sukses bila webhook 2xx;
+ *   tidak ada kanal → 503 (ADR 2026-08-25).
+ * - Di seluruh mesin waktu jebakan di bawah, kata "webhook"/"panggilan webhook" berarti
+ *   PENERUSAN LEAD SELURUHNYA (semua kanal yang aktif, berjalan paralel) — itulah yang
+ *   diukur cincin dan ditiru cabang jebakan, jadi waktu jebakan mengikuti kanal apa pun
+ *   yang aktif tanpa kode khusus per kanal.
  * - Tidak pernah menulis isi form (nama/kontak/pesan) atau URL webhook ke log.
  * - Respons error generik: tanpa stack, tanpa detail internal, tanpa header CORS.
  * - Situs tidak boleh bilang "terkirim" kalau tidak ada yang menerima.
@@ -35,6 +49,10 @@ const MAKS_BODY_BYTE = 16 * 1024;
 // Batas waktu ke webhook. Tanpa ini satu webhook lambat menahan permintaan
 // pengunjung sampai puluhan detik dan ikut menahan slot server.
 const BATAS_WAKTU_WEBHOOK_MS = 5_000;
+
+// Tenggat total kanal email (koneksi + STARTTLS + AUTH + DATA). Lebih longgar daripada
+// webhook karena SMTP butuh beberapa putaran; lewat tenggat → transport diputus, dibalas 502.
+const BATAS_WAKTU_EMAIL_MS = 10_000;
 
 // ————————————————————————————————————————————————————————————————
 // Bentuk permintaan (G-20a) — Origin, content-type, ambang waktu isi form
@@ -615,8 +633,8 @@ const contohGagal: Contoh[] = [];
  */
 let pengukuranPertamaDibuang = false;
 
-/** Atap contoh: batas waktu webhook plus kelonggaran untuk sisa penanganan. */
-const ATAP_CONTOH_MS = BATAS_WAKTU_WEBHOOK_MS + 1_000;
+/** Atap contoh: batas waktu kanal terlama (email/webhook) plus kelonggaran sisa penanganan. */
+const ATAP_CONTOH_MS = Math.max(BATAS_WAKTU_WEBHOOK_MS, BATAS_WAKTU_EMAIL_MS) + 1_000;
 
 /**
  * Pelacak beban instans: berapa panggilan webhook yang sedang berjalan, dan berapa
@@ -1069,6 +1087,109 @@ async function bacaBodyTerbatas(req: NextRequest): Promise<HasilBody> {
 }
 
 // ————————————————————————————————————————————————————————————————
+// Kanal penerusan (G-41): email SMTP primer + webhook opsional
+// ————————————————————————————————————————————————————————————————
+type Kanal = { email: Env | null; webhook: string | null };
+
+/**
+ * Kanal yang aktif untuk permintaan ini, atau `null` bila tidak ada satu pun (→ 503).
+ *
+ * Env sudah divalidasi saat boot (instrumentation.ts → exit 1), jadi `getEnv()` di sini tidak
+ * gagal di container yang sedang melayani. Kalau tetap gagal (mis. dijalankan tanpa boot hook),
+ * kanal email dianggap mati — TIDAK pernah dianggap hidup — dan hanya nama error yang dicatat.
+ */
+function kanalAktif(): Kanal | null {
+  let email: Env | null = null;
+  try {
+    const env = getEnv();
+    if (env.CONTACT_ENABLED) email = env;
+  } catch (err) {
+    console.error(`[lead] env tidak valid: ${err instanceof Error ? err.name : "unknown"}`);
+  }
+  const webhook = process.env.LEAD_WEBHOOK_URL || null;
+  return email || webhook ? { email, webhook } : null;
+}
+
+type DataLead = z.infer<typeof LeadSchema>;
+
+/** Nama/kode error yang aman dicatat: hanya token huruf besar/garis bawah (mis. EAUTH). */
+function jenisError(err: unknown): string {
+  if (!(err instanceof Error)) return "unknown";
+  const kode = (err as { code?: unknown }).code;
+  return typeof kode === "string" && /^[A-Z_]{2,32}$/.test(kode) ? `${err.name}/${kode}` : err.name;
+}
+
+async function kirimEmail(env: Env, data: DataLead): Promise<boolean> {
+  try {
+    // Isi TIDAK diberi `amanUntukSpreadsheet`: email bukan spreadsheet, dan yang dibaca owner
+    // di inbox harus persis yang diketik pengunjung. Header aman: lihat lib/mailer.ts.
+    await kirimEmailLead(
+      env,
+      PENERIMA_LEAD,
+      { nama: data.nama, kontak: data.kontak, pesan: data.pesan, produk: data.produk ?? "lainnya" },
+      BATAS_WAKTU_EMAIL_MS,
+    );
+    return true;
+  } catch (err) {
+    // Tanpa PII dan tanpa host/alamat: hanya jenis error.
+    console.error(`[lead] email gagal terkirim: ${jenisError(err)}`);
+    return false;
+  }
+}
+
+async function kirimWebhook(webhook: string, data: DataLead): Promise<boolean> {
+  try {
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(BATAS_WAKTU_WEBHOOK_MS),
+      body: JSON.stringify({
+        nama: amanUntukSpreadsheet(data.nama),
+        kontak: amanUntukSpreadsheet(data.kontak),
+        pesan: amanUntukSpreadsheet(data.pesan),
+        produk: data.produk ?? "lainnya",
+        diterima: new Date().toISOString(),
+      }),
+    });
+
+    // Balasan webhook tidak dipakai — lepaskan koneksinya, jangan digantung.
+    await res.body?.cancel().catch(() => undefined);
+
+    if (res.ok) return true;
+    // Hanya status; JANGAN pernah mencatat isi form atau URL webhook (URL bisa
+    // memuat token rahasia).
+    console.error(`[lead] webhook menolak kiriman, status ${res.status}`);
+    return false;
+  } catch {
+    console.error("[lead] webhook tidak terjangkau atau melewati batas waktu");
+    return false;
+  }
+}
+
+/**
+ * Teruskan ke semua kanal aktif SECARA PARALEL; hasilnya = apakah boleh membalas "terkirim".
+ *
+ * - Email aktif → hasil = hasil EMAIL. Webhook (bila ada) tetap dijalankan dan kegagalannya
+ *   hanya dicatat: lead sudah sampai ke inbox owner, jadi membalas 502 akan membuat pengunjung
+ *   mengirim ulang (lead ganda) padahal tidak ada yang hilang.
+ * - Hanya webhook → hasil = hasil webhook (perilaku sebelum G-41, tidak berubah).
+ * - Tidak pernah membalas sukses bila kanal primer gagal: "terkirim" palsu dilarang ADR 2026-08-25.
+ * Paralel, bukan berurutan: waktu tunggu pengunjung = kanal terlama, bukan jumlah keduanya.
+ */
+async function teruskanLead(kanal: Kanal, data: DataLead): Promise<boolean> {
+  const [email, webhook] = await Promise.all([
+    kanal.email ? kirimEmail(kanal.email, data) : Promise.resolve(null),
+    kanal.webhook ? kirimWebhook(kanal.webhook, data) : Promise.resolve(null),
+  ]);
+  if (email !== null) {
+    if (webhook === false) console.error("[lead] webhook gagal; lead tetap terkirim lewat email (kanal primer)");
+    return email;
+  }
+  return webhook === true;
+}
+
+// ————————————————————————————————————————————————————————————————
 // Handler
 // ————————————————————————————————————————————————————————————————
 function balas(
@@ -1143,10 +1264,10 @@ export async function POST(req: NextRequest) {
     return balas({ error: PESAN_GAGAL }, 403);
   }
 
-  const webhook = process.env.LEAD_WEBHOOK_URL;
-  if (!webhook) {
-    // Tanpa tujuan, lead hilang senyap. Jangan pernah membalas {ok:true} di sini —
-    // halaman kontak menjanjikan "Pesan Anda terkirim."
+  const kanal = kanalAktif();
+  if (!kanal) {
+    // Tanpa tujuan (email mati DAN webhook kosong), lead hilang senyap. Jangan pernah
+    // membalas {ok:true} di sini — halaman kontak menjanjikan "Pesan Anda terkirim."
     //
     // Diperiksa SEBELUM cabang honeypot supaya bot tidak bisa membedakan jebakan
     // dari kiriman biasa hanya dengan melihat 503 vs 200.
@@ -1174,39 +1295,8 @@ export async function POST(req: NextRequest) {
   mulaiPanggilanWebhook();
   const mulaiWebhook = performance.now();
   try {
-    let sukses = false;
-    let balasan: ReturnType<typeof balas>;
-    try {
-      const res = await fetch(webhook, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        cache: "no-store",
-        signal: AbortSignal.timeout(BATAS_WAKTU_WEBHOOK_MS),
-        body: JSON.stringify({
-          nama: amanUntukSpreadsheet(parsed.data.nama),
-          kontak: amanUntukSpreadsheet(parsed.data.kontak),
-          pesan: amanUntukSpreadsheet(parsed.data.pesan),
-          produk: parsed.data.produk ?? "lainnya",
-          diterima: new Date().toISOString(),
-        }),
-      });
-
-      // Balasan webhook tidak dipakai — lepaskan koneksinya, jangan digantung.
-      await res.body?.cancel().catch(() => undefined);
-
-      if (res.ok) {
-        sukses = true;
-        balasan = balas({ ok: true }, 200);
-      } else {
-        // Hanya status; JANGAN pernah mencatat isi form atau URL webhook (URL bisa
-        // memuat token rahasia).
-        console.error(`[lead] webhook menolak kiriman, status ${res.status}`);
-        balasan = balas({ error: PESAN_GAGAL }, 502);
-      }
-    } catch {
-      console.error("[lead] webhook tidak terjangkau atau melewati batas waktu");
-      balasan = balas({ error: PESAN_GAGAL }, 502);
-    }
+    const sukses = await teruskanLead(kanal, parsed.data);
+    const balasan = sukses ? balas({ ok: true }, 200) : balas({ error: PESAN_GAGAL }, 502);
 
     // SATU HOP PENJADWAL, sengaja, supaya kedua cabang melewati jumlah hop yang sama
     // (G-24, temuan MEDIUM auditor).

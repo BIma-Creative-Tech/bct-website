@@ -56,10 +56,16 @@ Situs self-host di VPS platform, **bukan Vercel**. Alurnya:
 | Env | Wajib | Keterangan |
 |---|---|---|
 | `SITE_URL` | ya | URL publik kanonik tanpa slash akhir. Sumber metadataBase, canonical, `og:url`, kartu OG, `sitemap.xml`, `robots.txt`. Dicek saat boot — kosong/tidak sah → container exit 1. Host berlabel `staging` atau localhost → `<meta name="robots" content="noindex, nofollow">` + robots `Disallow: /` |
-| `LEAD_WEBHOOK_URL` | agar form berfungsi | Kosong → `/api/lead` sengaja membalas **503** dan form menampilkan error jujur (ADR 2026-08-25). Wajib `https://` dan tujuan milik BCT (data pribadi pengunjung melintas ke sana). **Catatan:** template compose infra saat ini hanya meneruskan `SITE_URL` + `CONTACT_ENABLED` — `LEAD_WEBHOOK_URL` belum ikut diteruskan (keputusan owner/infra, lihat G-12) |
+| `CONTACT_ENABLED` | tidak (default `false`) | `true` → kanal **email** form `/kontak` aktif (kanal primer, ADR 2026-09-26 G-41); semua `SMTP_*` di bawah wajib — dicek saat boot, gagal → container exit 1. Penerima = konstanta server-only `lib/lead-recipient.ts` (tidak pernah terbit ke klien; dijaga `check-pii.mjs`) |
+| `SMTP_HOST`, `SMTP_PORT` | bila form aktif | port default `587`; `465` = TLS implisit, port lain STARTTLS **wajib** (sertifikat selalu diverifikasi) |
+| `SMTP_USER`, `SMTP_FROM_ADDRESS` | bila form aktif | akun SMTP & alamat pengirim (From); Reply-To = kontak pengunjung hanya bila ia email sah |
+| `SMTP_PASSWORD_FILE` | bila form aktif | **path** file password (secret mount read-only, uid 1001), bukan password; dibaca saat kirim, tidak pernah di-log |
+| `LEAD_WEBHOOK_URL` | tidak | Kanal **tambahan** opsional. Email aktif → sukses hanya bila email terkirim (webhook gagal dicatat, tidak fatal); hanya webhook → sukses bila webhook 2xx; email mati DAN webhook kosong → `/api/lead` sengaja membalas **503** (ADR 2026-08-25). Wajib `https://` dan tujuan milik BCT. **Catatan:** template compose infra belum meneruskan `LEAD_WEBHOOK_URL` |
 | `NEXT_PUBLIC_UMAMI_SRC`, `NEXT_PUBLIC_UMAMI_ID` | tidak | Dibaca saat **build**. Origin https dari `SRC` otomatis diizinkan CSP; skrip wajib lewat `next/script` (nonce) |
 
 Keterangan lengkap di `.env.example`. Tidak ada secret di `NEXT_PUBLIC_*` (boot gagal bila namanya mirip secret).
+
+Provisioning form kontak = `provision-web-client.sh … --contact` (memuat `templates/web-client/docker-compose.contact.yml`: `CONTACT_ENABLED=true`, `SMTP_*`, secret `./secrets/smtp_password.secret` owner 1001:1001 mode 0400). **Tindak lanjut infra:** router rate limit `contact` Traefik hanya mencocokkan `POST /contact` & `/api/contact`; `/api/lead` situs ini masih kena `ratelimit-default` (rate limit per IP aplikasi tetap berlaku).
 
 ### Syarat keamanan yang masih berlaku
 
