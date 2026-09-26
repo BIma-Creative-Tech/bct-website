@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { kelas, panahTombol, tombolPrimer, tombolSekunder } from "./styles";
+import { Icon } from "./icon";
 
 /** Tombol untuk tautan internal (Next.js Link). Label & href dari content/copy/*. */
 export function LinkButton({
@@ -24,9 +25,7 @@ export function LinkButton({
     >
       {children}
       {panah ? (
-        <span aria-hidden="true" className={panahTombol}>
-          &rarr;
-        </span>
+        <Icon name="arrow-right-02" size={16} className={panahTombol} />
       ) : null}
     </Link>
   );

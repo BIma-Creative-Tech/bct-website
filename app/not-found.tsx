@@ -7,6 +7,7 @@ import { WaButton } from "@/components/wa-button";
 import { tidakDitemukan } from "@/content/copy";
 import { saringTautan, tautanHidup } from "@/content/rute";
 import { produk, site } from "@/content/site";
+import { Icon } from "@/components/icon";
 
 /**
  * Halaman 404 seluruh situs (rute /_not-found).
@@ -131,12 +132,11 @@ export default function TidakDitemukan() {
               >
                 <h3 className="flex items-start justify-between gap-3 font-display text-lg font-bold text-ink">
                   {item.nama}
-                  <span
-                    aria-hidden="true"
-                    className="text-muted group-hover:text-accent motion-safe:transition-colors"
-                  >
-                    &rarr;
-                  </span>
+                  <Icon
+                    name="arrow-right-02"
+                    size={20}
+                    className="mt-1 text-muted group-hover:text-accent motion-safe:transition-colors"
+                  />
                 </h3>
                 <p className="mt-3 text-sm text-ink-2">{item.subLabel}</p>
               </Link>

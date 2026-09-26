@@ -25,6 +25,7 @@ import { WaButton } from "@/components/wa-button";
 import { beranda } from "@/content/copy";
 import { ruteHidup, tautanHidup } from "@/content/rute";
 import { bukti, produk, site, statistik, type Paket, type SlugProduk } from "@/content/site";
+import { Icon } from "@/components/icon";
 
 /**
  * Beranda.
@@ -93,7 +94,7 @@ const penutupSekunder = tautanHidup(beranda.penutup.sekunder);
 
 /** Ikon chip kartu produk per slug. `Record<SlugProduk, …>`: produk baru tanpa ikon = build gagal. */
 const IKON_PRODUK: Record<SlugProduk, NamaIkon> = {
-  "bima-insight": "data",
+  "bima-insight": "dasbor",
   odoo: "database",
   "web-apps": "code",
 };
@@ -131,7 +132,7 @@ export default function Home() {
           {/* Badge pill (pola referensi) menggantikan eyebrow bergaris khusus di hero.
               Teks: copy + lokasi dari content/site.ts. */}
           <p className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-2 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-accent motion-safe:animate-muncul-naik">
-            <IkonBidang nama="kilau" className="h-4 w-4 shrink-0" />
+            <IkonBidang nama="kilau" size={16} />
             {/* Lokasi hanya disambung bila diisi — `site.location` boleh kosong. */}
             <span>{[beranda.hero.eyebrow, site.location].filter(Boolean).join(" · ")}</span>
           </p>
@@ -209,16 +210,15 @@ export default function Home() {
                   )}
                 >
                   <span className={kelas(chipIkon, "mb-5 self-start")}>
-                    <IkonBidang nama={IKON_PRODUK[item.slug]} />
+                    <IkonBidang nama={IKON_PRODUK[item.slug]} type="bulk" />
                   </span>
                   <h3 className="flex items-start justify-between gap-3 font-display text-xl font-bold text-ink group-hover:text-accent motion-safe:transition-colors">
                     {item.nama}
-                    <span
-                      aria-hidden="true"
-                      className="text-muted group-hover:text-accent motion-safe:transition motion-safe:group-hover:translate-x-1"
-                    >
-                      &rarr;
-                    </span>
+                    <Icon
+                      name="arrow-right-02"
+                      size={20}
+                      className="mt-1 text-muted group-hover:text-accent motion-safe:transition motion-safe:group-hover:translate-x-1"
+                    />
                   </h3>
                   <p className="mt-3 flex-1 text-sm text-ink-2">{item.ringkas}</p>
                   {paketMasuk ? (

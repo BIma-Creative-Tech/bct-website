@@ -1,5 +1,6 @@
 import { waMengambang } from "@/content/copy";
 import { waLink } from "@/content/site";
+import { Icon } from "./icon";
 import { fokusRing, kelas } from "./styles";
 
 /**
@@ -28,33 +29,10 @@ export function WaFloatingButton() {
         fokusRing,
       )}
     >
-      <IkonPercakapan />
+      <Icon name="messages-2" size={20} />
       {/* Label disembunyikan di layar sempit agar tidak menutupi konten; nama
           tombol untuk pembaca layar tetap dari aria-label di atas. */}
       <span className="hidden sm:inline">{waMengambang.label}</span>
     </a>
-  );
-}
-
-/**
- * Ikon percakapan — inline SVG buatan sendiri (tanpa aset/CDN eksternal dan tanpa
- * warna di luar token; mewarisi currentColor).
- */
-function IkonPercakapan() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-5 w-5 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12Z" />
-      <path d="M9 11h6" />
-      <path d="M9 14.5h3.5" />
-    </svg>
   );
 }

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { navCta, navProduk, navUtama } from "@/content/copy";
 import { saringTautan } from "@/content/rute";
 import { produk, site } from "@/content/site";
+import { Icon } from "./icon";
 import { fokusRing, kelas, wadah } from "./styles";
 import { WaButton } from "./wa-button";
 
@@ -147,7 +148,11 @@ export function SiteNav() {
                 className={kelas(kelasTautanMenu, "gap-1", produkTerbuka && "text-ink")}
               >
                 {pemicuProduk.label}
-                <IkonChevron terbuka={produkTerbuka} />
+                <Icon
+                  name="arrow-down-01"
+                  size={14}
+                  className={kelas(produkTerbuka && "rotate-180", "motion-safe:transition-transform")}
+                />
               </button>
               <div
                 ref={panelProdukRef}
@@ -208,7 +213,9 @@ export function SiteNav() {
             fokusRing,
           )}
         >
-          <IkonMenu terbuka={menuTerbuka} />
+          {/* `key` memasang ulang elemen saat ikon berganti: IconsaxLoader hanya
+              mengaktifkan <iconsax-icon> BARU (atribut `name` tidak dikelola React). */}
+          <Icon key={menuTerbuka ? "tutup" : "buka"} name={menuTerbuka ? "close-circle" : "menu"} size={22} />
           <span className="sr-only">{menuTerbuka ? A11Y.tutupMenu : A11Y.bukaMenu}</span>
         </button>
       </div>
@@ -269,50 +276,5 @@ export function SiteNav() {
         </div>
       </nav>
     </header>
-  );
-}
-
-/** Ikon dekoratif — inline SVG (tanpa aset CDN), mewarisi currentColor. */
-function IkonChevron({ terbuka }: { terbuka: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 16 16"
-      className={kelas("h-3 w-3", terbuka && "rotate-180")}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3.5 6 8 10.5 12.5 6" />
-    </svg>
-  );
-}
-
-function IkonMenu({ terbuka }: { terbuka: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-    >
-      {terbuka ? (
-        <>
-          <path d="M4.5 4.5 15.5 15.5" />
-          <path d="M15.5 4.5 4.5 15.5" />
-        </>
-      ) : (
-        <>
-          <path d="M3 6h14" />
-          <path d="M3 10h14" />
-          <path d="M3 14h14" />
-        </>
-      )}
-    </svg>
   );
 }
