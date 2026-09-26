@@ -11,6 +11,9 @@ import { fokusRing, kelas } from "./styles";
  * - Safe area: jarak dari tepi = max(1.25rem, inset area) supaya tidak tertutup
  *   home indicator / sudut layar melengkung.
  * - z-index 30 → di bawah header (z-40) agar panel menu mobile tetap menutupinya.
+ * - Disembunyikan di layar < 640 px pada halaman yang memuat form kontak (kelas
+ *   `.wa-mengambang`, aturan di app/globals.css): di sana tombol tetap menutupi widget
+ *   Turnstile dan tombol kirim, sementara halaman itu sudah punya tombol WA sendiri.
  * - Tanpa animasi masuk/keluar; hanya transisi warna yang dibungkus `motion-safe:`
  *   sehingga otomatis mati saat prefers-reduced-motion: reduce.
  */
@@ -22,7 +25,7 @@ export function WaFloatingButton() {
       rel="noopener noreferrer"
       aria-label={waMengambang.ariaLabel}
       className={kelas(
-        "fixed right-[max(1.25rem,env(safe-area-inset-right))] bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-30",
+        "wa-mengambang fixed right-[max(1.25rem,env(safe-area-inset-right))] bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-30",
         "inline-flex min-h-14 min-w-14 items-center justify-center gap-2 rounded-full",
         "border border-accent bg-accent px-4 text-sm font-semibold text-bg",
         "hover:bg-ink hover:border-ink motion-safe:transition-colors",

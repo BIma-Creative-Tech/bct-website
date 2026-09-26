@@ -233,3 +233,12 @@ h1, h2, h3 {
   text-wrap: balance;
   line-height: 1.15;
 }
+
+/* Tombol WA mengambang disembunyikan di layar sempit pada halaman yang memuat form
+   kontak: di sana ia menutupi widget Turnstile dan tombol kirim, sedangkan halaman
+   itu sudah menampilkan tombol WA sendiri (jalur kontak + penutup). */
+@media (max-width: 639px) {
+  body:has([data-form-kontak]) .wa-mengambang {
+    display: none;
+  }
+}

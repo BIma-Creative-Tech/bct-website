@@ -5,6 +5,10 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ## [Unreleased]
 
+### Fixed
+
+- G-45 (2026-09-27): tombol WhatsApp mengambang disembunyikan di layar < 640 px pada halaman yang memuat form kontak (`body:has([data-form-kontak]) .wa-mengambang`), karena di 390 px ia menutupi sisi kanan widget Turnstile dan tombol kirim; /kontak tetap punya tombol WA sendiri.
+
 ### Security
 
 - G-42 (2026-09-26, keputusan owner; menutup **H-1** audit ulang G-19): `lib/anggaran-kirim.ts` — anggaran kirim in-memory untuk `/api/lead`: ember token situs (ledakan 8, terisi 20/jam) + jendela geser 60 menit (≤ 20) + atap 3/hari per IP; penolakan satu atap tidak memakan jatah atap lain. Konstanta `ANGGARAN_KIRIM` di `app/api/lead/batas.ts`, di bawah batas mailbox `info@` (30/jam, ledakan 10): kiriman ≤ 10 + 30·t/jam untuk setiap selang t. Uji `tests/unit/anggaran-kirim.test.ts` (8).
