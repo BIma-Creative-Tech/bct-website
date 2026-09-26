@@ -15,7 +15,8 @@ Website company profile + aset jualan BCT. **Tujuan tunggal halaman apa pun: men
 - Runtime: **Node 24** (`engines` `>=24 <25`), semua dependency di-pin versi persis (tanpa `^`/`~`, `.npmrc` `save-exact`). Referensi platform: `/opt/src/web-starter` (ADR 2026-09-26).
 - Deploy: **self-host di VPS di belakang Traefik** (BUKAN Vercel) — image `ghcr.io/bctech-adm/bct-website`, diprovisikan repo infra lewat `/opt/infra/scripts/provision-web-client.sh`. Kontrak container: port 3000, `GET /api/health`, uid 1001, rootfs read-only, env `SITE_URL` wajib (URL kanonik; host `staging`/localhost → noindex). CSP ber-nonce per request di `proxy.ts` (Traefik tidak menyetel CSP), HSTS di Traefik. Detail: README §Deploy.
 - Analytics: Umami (env `NEXT_PUBLIC_UMAMI_*`, origin-nya sudah diizinkan CSP; skrip wajib lewat `next/script` agar menerima nonce; jangan pakai Google Analytics).
-- Tidak ada komponen library berat (shadcn boleh dipetik per-komponen bila perlu). Tidak ada state management library.
+- **Stack UI referensi platform** (ADR 2026-09-26 "Stack UI referensi", sama dengan `/opt/src/web-starter`, versi di-pin persis): ikon **Iconsax** `iconsax@0.1.1` (web component, ikon GRATIS saja), animasi **Motion** `motion@13.4.3` dan **anime.js** `animejs@4.5.0`, komponen **21st.dev** (Magic UI, MIT) yang DISALIN ke `components/ui-21st/` (bukan dependency runtime; asal-usul & lisensi wajib dicatat di `COMPONENTS.md`, komponen tanpa lisensi jelas ditolak). shadcn hanya bila benar-benar perlu, per komponen. Tidak ada state management library. Keputusan desain/gerak + query ui-ux-pro-max: `docs/design.md`.
+- Ikon: pakai `<Icon name=…>` (`components/icon.tsx`); tambah nama di `components/icon-names.ts` lalu `npm run icons` (otomatis juga di `npm run build`) dan commit `lib/generated/iconsax-icons.json`. Jangan `npx iconsax sync` (itu ikon Pro berbayar), jangan menggambar SVG ikon sendiri bila Iconsax punya padanannya (logo merek boleh tetap). Setelah mengganti `name` ikon secara dinamis, pasang `key` baru (loader hanya mengaktifkan elemen baru).
 
 ### Commands
 
@@ -23,7 +24,7 @@ Host VPS **tidak punya Node** — jalankan lewat container (repo di-mount), sepe
 
 ```bash
 docker run --rm -v "$PWD:/app" -w /app node:24.21.0-bookworm-slim sh -c \
-  'npm ci && npm run lint && npm run typecheck && npm test && npm run build'
+  'npm ci && npm run icons && npm run lint && npm run typecheck && npm test && npm run build'
 # dev server (SITE_URL wajib)
 docker run --rm -it -v "$PWD:/app" -w /app -p 127.0.0.1:3000:3000 -e SITE_URL=http://localhost:3000 \
   node:24.21.0-bookworm-slim npm run dev -- -H 0.0.0.0
@@ -40,7 +41,7 @@ Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token dide
 - Dark: bg `#0e0d0b`, surface `#1a1a19`, ink `#f2f0e9`, ink-2 `#c3c2b7`, line `#2c2c2a`, accent `#f0566f` (merah dicerahkan agar lolos AA di latar gelap).
 - Gradien merek `--gradien` = `linear-gradient(to right, #b20a2c, #fffbd5)` (dark: ujung krem transparan 35%), lewat utilitas `bg-gradien`. **Hanya pita dekoratif ber-`aria-hidden`** (tepi atas header, penutup hero, tepi atas kartu CTA, kartu OG) — tidak pernah latar teks, karena tidak ada warna teks yang lolos AA di sepanjang merah→krem (ADR 2026-09-24).
 - Blok di atas foto (hero beranda) memakai kelas `.tema-gelap` di `app/globals.css` — palet dark yang sama dipasang lokal, jadi tetap gelap di light mode. Jangan menaruh teks di atas foto tanpa kelas ini dan tanpa selubung (`bg-selubung-rata` / `lg:bg-selubung-foto`).
-- Gerak & efek (G-29): pakai yang sudah ada — `motion-safe:animate-muncul-naik` (+ `[animation-delay:…]`), kelas `.muncul-saat-gulir`, `kartuInteraktif` / `chipIkon` / `nomorBesar` di `components/styles.ts`, `<BlobLatar>`, `<JudulSorot>`, `<CahayaKursor>` (client, hanya beranda). Setiap gerak WAJIB di balik `motion-safe:` / `prefers-reduced-motion`. Jangan menambah library animasi.
+- Gerak & efek (G-38/G-39, menggantikan aturan "tanpa library animasi" G-29): **setiap gerak WAJIB di balik `motion-safe:` / `prefers-reduced-motion` dan hanya menganimasikan `transform`/`opacity`** (compositor). Mekanisme yang ada — pakai, jangan buat jalur kedua: intro hero = `<HeroAnimator>` (anime.js adapter WAAPI, mulai saat idle, teks hero TIDAK pernah disembunyikan; tandai baris dengan `data-hero-init="lift"`); reveal saat digulir = `<Reveal>` / `propsReveal(i)` (`components/reveal.tsx`) yang dijalankan `<ScrollEnhancer>` di root layout; angka = `<AngkaStatistik teks=…>` (Number Ticker, server merender nilai akhir, angka HANYA dari `content/site.ts`); Motion hanya di-import dinamis (`lib/motion-lazy.ts`), jangan `motion/react` di komponen atas-lipatan; gerak ambient tanpa akhir (blob, chip melayang, kotak grid) hanya ≥ 768px; marquee wajib bisa dijeda (`MarqueePauseButton`, WCAG 2.2.2) dan hanya berisi konten nyata. Komponen 21st.dev yang ada: `bento-grid`, `number-ticker`, `marquee`, `animated-grid-pattern` — warna hanya token BCT. Utilitas gaya bersama tetap `kartuInteraktif` / `chipIkon` / `nomorBesar` di `components/styles.ts`, `<BlobLatar>`, `<JudulSorot>`, `<CahayaKursor>` (client, hanya beranda).
 - Dark mode wajib jalan (class/system). Eyebrow style: mono uppercase letter-spacing + garis pendek accent di kiri.
 - Nada visual: tenang, presisi, "engineering studio" — bukan agensi marketing yang ramai. Satu aksen merah (plus pita gradiennya), sisanya netral.
 

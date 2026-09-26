@@ -7,6 +7,7 @@ Website resmi PT Bima Creative Tech (BCT) — company profile, katalog produk, d
 - Data produk/harga/kontak: `content/site.ts` (satu-satunya sumber kebenaran).
 - Copy halaman (teks Bahasa Indonesia): `content/copy/`, diimpor lewat barrel `@/content/copy` — angka harga dan kontak tidak diduplikasi di sana.
 - Komponen UI bersama (nav, footer, tombol WhatsApp, skip link): `components/`.
+- Stack UI referensi platform (sama dengan web-starter): ikon **Iconsax** (`<Icon>`, subset gratis `npm run icons` → `lib/generated/iconsax-icons.json`, otomatis di `npm run build`), gerak **anime.js** (intro hero) + **Motion** (Number Ticker), komponen **21st.dev** (Magic UI, MIT) disalin ke `components/ui-21st/`. Asal-usul & lisensi: `COMPONENTS.md`; keputusan desain/gerak (query ui-ux-pro-max): `docs/design.md`.
 - Rute yang boleh ditautkan: `content/rute.ts` (`RUTE_HIDUP`) — satu-satunya sumber rute hidup; nav, footer, CTA, halaman 404, dan `app/sitemap.ts` semuanya membacanya, jadi tidak ada daftar rute kedua.
 - Aset yang hanya dipakai saat build: `assets/fonts/` (3 TTF + `LICENSE.txt` OFL) untuk merender kartu OG. Sengaja BUKAN di `public/` — berkas ini tidak boleh dilayani ke pengunjung.
 - SEO dibangkitkan kode, bukan berkas statis: `app/sitemap.ts` → `/sitemap.xml`, `app/robots.ts` → `/robots.txt`, `app/icon.tsx` → favicon, dan tujuh `opengraph-image.tsx` → kartu OG 1200×630. (`/favicon.ico` sendiri tetap 404: Next melarang favicon dirender kode — lihat W3-01 di `docs/checklist.md`.)
@@ -17,7 +18,7 @@ Node **24** (`engines` `>=24 <25`), semua dependency di-pin versi persis. Host V
 
 ```bash
 docker run --rm -v "$PWD:/app" -w /app node:24.21.0-bookworm-slim sh -c \
-  'npm ci && npm run lint && npm run typecheck && npm test && npm run build'
+  'npm ci && npm run icons && npm run lint && npm run typecheck && npm test && npm run build'
 # dev server
 docker run --rm -it -v "$PWD:/app" -w /app -p 127.0.0.1:3000:3000 -e SITE_URL=http://localhost:3000 \
   node:24.21.0-bookworm-slim npm run dev -- -H 0.0.0.0
