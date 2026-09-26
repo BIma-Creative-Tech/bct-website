@@ -61,11 +61,17 @@ Situs self-host di VPS platform, **bukan Vercel**. Alurnya:
 | `SMTP_USER`, `SMTP_FROM_ADDRESS` | bila form aktif | akun SMTP & alamat pengirim (From); Reply-To = kontak pengunjung hanya bila ia email sah |
 | `SMTP_PASSWORD_FILE` | bila form aktif | **path** file password (secret mount read-only, uid 1001), bukan password; dibaca saat kirim, tidak pernah di-log |
 | `LEAD_WEBHOOK_URL` | tidak | Kanal **tambahan** opsional. Email aktif → sukses hanya bila email terkirim (webhook gagal dicatat, tidak fatal); hanya webhook → sukses bila webhook 2xx; email mati DAN webhook kosong → `/api/lead` sengaja membalas **503** (ADR 2026-08-25). Wajib `https://` dan tujuan milik BCT. **Catatan:** template compose infra belum meneruskan `LEAD_WEBHOOK_URL` |
+| `TURNSTILE_SITE_KEY` | tidak (berpasangan) | Site key widget **Cloudflare Turnstile** (G-43) — publik, tapi sengaja env **server** (bukan `NEXT_PUBLIC_*`): dibaca saat request dan dioper ke form `/kontak` sebagai prop, jadi satu image bisa melayani staging & production dengan widget berbeda. Kosong bersama `TURNSTILE_SECRET_FILE` → Turnstile mati, form seperti sebelumnya. Hanya salah satu terisi → container **exit 1**. Aktif → CSP menambah `https://challenges.cloudflare.com` di `script-src` dan `frame-src` |
+| `TURNSTILE_SECRET_FILE` | tidak (berpasangan) | **Path** file berisi secret key Turnstile (secret mount read-only, uid 1001), pola sama dengan `SMTP_PASSWORD_FILE`; dicek terbaca & tidak kosong saat boot (gagal → exit 1), dibaca lagi saat verifikasi, tidak pernah di-log. Kunci UJI Cloudflare (`1x…/2x…/3x…AA`) memunculkan peringatan boot |
 | `NEXT_PUBLIC_UMAMI_SRC`, `NEXT_PUBLIC_UMAMI_ID` | tidak | Dibaca saat **build**. Origin https dari `SRC` otomatis diizinkan CSP; skrip wajib lewat `next/script` (nonce) |
 
 Keterangan lengkap di `.env.example`. Tidak ada secret di `NEXT_PUBLIC_*` (boot gagal bila namanya mirip secret).
 
 Provisioning form kontak = `provision-web-client.sh … --contact` (memuat `templates/web-client/docker-compose.contact.yml`: `CONTACT_ENABLED=true`, `SMTP_*`, secret `./secrets/smtp_password.secret` owner 1001:1001 mode 0400). **Tindak lanjut infra:** router rate limit `contact` Traefik hanya mencocokkan `POST /contact` & `/api/contact`; `/api/lead` situs ini masih kena `ratelimit-default` (rate limit per IP aplikasi tetap berlaku).
+
+**Tindak lanjut infra Turnstile (G-43, belum dikerjakan — repo infra tidak disentuh dari sini):** `templates/web-client/docker-compose.contact.yml` perlu (1) meneruskan env `TURNSTILE_SITE_KEY` dan `TURNSTILE_SECRET_FILE=/run/secrets/turnstile_secret`, dan (2) me-mount secret `./secrets/turnstile_secret.secret` (owner 1001:1001, mode 0400) seperti `smtp_password`. Keduanya harus hadir bersamaan atau tidak sama sekali — satu tanpa yang lain membuat container exit 1. Owner membuat widget Turnstile di dashboard Cloudflare untuk hostname `bct.staging.bimacreative.tech` (lalu domain production), mode **Managed**; server memeriksa `hostname` jawaban siteverify = host `SITE_URL` dan `action` = `kontak`.
+
+**Anggaran kirim (G-42):** `/api/lead` meneruskan paling banyak **20 kiriman/jam situs (ledakan 8)** dan **3/hari per IP** — di bawah batas mailbox `info@` (30/jam, ledakan 10). Lewat anggaran → 503 + arahan WhatsApp. Angka di `app/api/lead/batas.ts` (`ANGGARAN_KIRIM`); in-memory per container, restart = penuh lagi.
 
 ### Syarat keamanan yang masih berlaku
 

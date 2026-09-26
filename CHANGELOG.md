@@ -18,6 +18,7 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 ### Added
 
 - G-43: widget Turnstile di form `/kontak` — hanya bila server mengoper site key (`halaman-kontak.tsx` membaca env saat request → prop `kunciPemeriksaan`; bukan `NEXT_PUBLIC_*`). `api.js?render=explicit` dimuat lewat `createElement` dari chunk form (diizinkan `'strict-dynamic'`, nonce tidak menyeberang ke prop), `appearance: interaction-only`, `size: flexible`, `language: id`, `action: kontak`; token dikirim sebagai `cf-turnstile-response` dan widget di-reset setelah setiap balasan. Tanpa token kiriman tertahan dengan copy baru `form.pemeriksaan.menunggu` (isian utuh, tombol WhatsApp tetap). Turnstile mati → markup form tidak berubah, nol permintaan ke Cloudflare.
+- G-42..G-44 docs: tiga ADR baru di `docs/decisions.md` (anggaran kirim; Turnstile opsional — posisi pagar, 403 yang sama, fail-open saat siteverify tak terjangkau, alasan bukan `NEXT_PUBLIC_*`; jebakan tidak pernah diteruskan — menggantikan ADR 2026-08-26 "Jendela kalibrasi"), `SECURITY.md` (anggaran, Turnstile, secret file, tambahan CSP bersyarat), README §Env (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_FILE`) + tindak lanjut infra, `.env.example`, `CLAUDE.md`, komentar kontrak `Dockerfile`.
 
 
 ### Changed

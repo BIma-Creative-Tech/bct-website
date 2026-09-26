@@ -8,6 +8,7 @@
 #   rootfs read-only; hanya /tmp dan /app/.next/cache yang writable (tmpfs) ·
 #   env: SITE_URL (wajib); CONTACT_ENABLED + SMTP_HOST/PORT/USER/FROM_ADDRESS/PASSWORD_FILE (kanal email
 #   /api/lead, kontrak web-starter); LEAD_WEBHOOK_URL (opsional). Tanpa kanal → /api/lead 503.
+#   TURNSTILE_SITE_KEY + TURNSTILE_SECRET_FILE (opsional, berpasangan; salah satu saja → exit 1; G-43).
 #   Container TIDAK boleh diberi port publik: IP klien rate limit dipercaya dari Traefik.
 ARG NODE_IMAGE=node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
 

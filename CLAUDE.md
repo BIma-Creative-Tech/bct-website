@@ -64,7 +64,7 @@ Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token dide
 | `/studi-kasus` | KOMDIGI e-Telekomunikasi + retail | belum (W2-03) — tertahan menunggu fakta proyek dari owner |
 | `/tentang` | Sejarah BCT, cara kerja, tiga mesin | hidup (W2-04) |
 | `/insight` | Blog/artikel pendek (MDX) | belum (W2-06) |
-| `/kontak` | Form lead + WA | hidup (W2-05); `POST /api/lead` → email SMTP ke `info@` (kanal primer, `CONTACT_ENABLED=true` + `SMTP_*`) + webhook opsional `LEAD_WEBHOOK_URL`; tanpa kanal → 503 (G-41, menggantikan G-17) |
+| `/kontak` | Form lead + WA | hidup (W2-05); `POST /api/lead` → email SMTP ke `info@` (kanal primer, `CONTACT_ENABLED=true` + `SMTP_*`) + webhook opsional `LEAD_WEBHOOK_URL`; tanpa kanal → 503 (G-41, menggantikan G-17); anggaran kirim 20/jam situs + 3/hari per IP (G-42), Cloudflare Turnstile opsional `TURNSTILE_SITE_KEY`+`TURNSTILE_SECRET_FILE` (G-43), jebakan honeypot tidak pernah diteruskan (G-44) |
 
 **Rute hidup dibaca dari `content/rute.ts`** (`RUTE_HIDUP` + `ruteHidup()`/`saringTautan()`/`tautanHidup()`) — satu-satunya sumber; nav, footer, CTA, `app/not-found.tsx`, dan `app/sitemap.ts` semuanya memakainya, jadi menghidupkan `/studi-kasus` atau `/insight` cukup satu baris di berkas itu. Jangan membuat daftar rute kedua. Batas yang perlu diketahui: aturan ini belum dipaksakan mesin (G-23) — tautan literal ke rute mati masih lolos lint/tsc/build.
 
@@ -105,7 +105,7 @@ Tugas multi-langkah apa pun dimulai dari agent **`lead`** (`.claude/agents/lead.
 - **Papan status: `docs/checklist.md`.** Alur: ⬜ → 🔨 → 🧪 → 🟨 KONFIRMASI-OWNER → ✅. **Hanya owner (Ade) yang menjadikan ✅** — agent berhenti di 🟨 dengan bukti satu baris. Owner mengonfirmasi dengan "konfirmasi <ID>".
 - **Setiap perubahan kode** wajib memperbarui `CHANGELOG.md` ([Unreleased], format Keep a Changelog) dan `docs/checklist.md` di commit yang sama — CI merah bila tidak (`scripts/check-governance.mjs`).
 - **Commit**: Conventional Commits (feat/fix/chore/docs/ci/sec). **Rilis**: SemVer; tag `vX.Y.Z` (= `package.json` + heading CHANGELOG) → CI build + scan + smoke test → push `ghcr.io/bctech-adm/bct-website:X.Y.Z` (main → `:sha-<12>`); tag hanya setelah owner konfirmasi.
-- **Keamanan**: baca `SECURITY.md`; CSP ber-nonce di `proxy.ts`/`lib/csp.ts`, header statis di `next.config.ts`, dan pola `/api/lead` (zod + honeypot + rate limit) adalah baseline — jangan diturunkan.
+- **Keamanan**: baca `SECURITY.md`; CSP ber-nonce di `proxy.ts`/`lib/csp.ts`, header statis di `next.config.ts`, dan pola `/api/lead` (zod + honeypot + rate limit + anggaran kirim + Turnstile opsional) adalah baseline — jangan diturunkan.
 - **Keputusan penting** dicatat di `docs/decisions.md` (ADR mini) pada sesi yang sama.
 - Gerbang konfirmasi owner: deploy production, perubahan harga/pricing, dependency baru, perubahan CI/Docker, dan hal yang menyentuh data pribadi.
 
