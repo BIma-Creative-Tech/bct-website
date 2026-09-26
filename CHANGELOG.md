@@ -15,6 +15,10 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 - G-44: kalibrasi honeypot yang meneruskan ≤ 10 jebakan per proses ke sink owner (ADR 2026-08-26 "Jendela kalibrasi" digantikan).
 
+### Added
+
+- G-43: widget Turnstile di form `/kontak` — hanya bila server mengoper site key (`halaman-kontak.tsx` membaca env saat request → prop `kunciPemeriksaan`; bukan `NEXT_PUBLIC_*`). `api.js?render=explicit` dimuat lewat `createElement` dari chunk form (diizinkan `'strict-dynamic'`, nonce tidak menyeberang ke prop), `appearance: interaction-only`, `size: flexible`, `language: id`, `action: kontak`; token dikirim sebagai `cf-turnstile-response` dan widget di-reset setelah setiap balasan. Tanpa token kiriman tertahan dengan copy baru `form.pemeriksaan.menunggu` (isian utuh, tombol WhatsApp tetap). Turnstile mati → markup form tidak berubah, nol permintaan ke Cloudflare.
+
 
 ### Changed
 

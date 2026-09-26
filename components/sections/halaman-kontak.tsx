@@ -1,5 +1,6 @@
 import { BATAS_ISIAN } from "@/app/api/lead/batas";
 import { WaButton } from "@/components/wa-button";
+import { getEnv, turnstileAktif } from "@/lib/env";
 import type { FormKontakCopy, KontakCopy } from "@/content/copy";
 import { BlokCtaPenutup } from "./blok-cta-penutup";
 import { FormKontak } from "./form-kontak";
@@ -82,6 +83,21 @@ const ID_JUDUL = {
   penutup: "judul-penutup",
 } as const;
 
+/**
+ * Site key Turnstile (G-43) — dibaca DI SERVER saat request dan dioper sebagai prop, sesuai
+ * aturan repo "data situs server → klien lewat prop". Bukan NEXT_PUBLIC_*: nilai itu dibakar
+ * saat build, padahal satu image melayani staging & production dengan widget berbeda.
+ * Kunci situs memang publik (tampil di HTML); secret-nya tidak pernah menyentuh berkas ini.
+ */
+function kunciPemeriksaan(): string | undefined {
+  try {
+    const env = getEnv();
+    return turnstileAktif(env) ? env.TURNSTILE_SITE_KEY : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function HalamanKontak({ copy }: { copy: KontakCopy }) {
   return (
     <>
@@ -100,6 +116,7 @@ export function HalamanKontak({ copy }: { copy: KontakCopy }) {
             lihat catatan `tombolWa` di kepala berkas. */}
         <FormKontak
           copy={copyFormSiapPakai(copy.form)}
+          kunciPemeriksaan={kunciPemeriksaan()}
           tombolWa={
             <WaButton pesan={copy.penutup.primer.pesan} varian="sekunder">
               {copy.penutup.primer.label}

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { BATAS_ISIAN } from "@/app/api/lead/batas";
+import { AKSI_PEMERIKSAAN, BATAS_ISIAN } from "@/app/api/lead/batas";
 import { fokusRing, kelas, tombolPrimer } from "@/components/styles";
 import type { FormKontakCopy } from "@/content/copy";
 
@@ -109,6 +109,21 @@ import type { FormKontakCopy } from "@/content/copy";
  *    sebagai isian sungguhan (terukur auditor: tinggi 21 px), dan pengunjung yang
  *    mengisinya dapat balasan "Pesan Anda terkirim" padahal leadnya dibuang di
  *    server. Inline style ikut berlaku tanpa satu berkas CSS pun (G-21c).
+ *
+ * 12. PEMERIKSAAN TURNSTILE (G-43) — hanya bila server mengoper `kunciPemeriksaan` (env
+ *    TURNSTILE_SITE_KEY; kosong = form persis seperti sebelum G-43, nol skrip pihak ketiga).
+ *    - api.js dimuat oleh berkas ini lewat `document.createElement("script")`, BUKAN tag
+ *      <script> di HTML: skrip yang disisipkan skrip ber-nonce diizinkan `'strict-dynamic'`
+ *      tanpa nonce, jadi nonce CSP tidak perlu menyeberang ke prop klien (muatan RSC). URL-nya
+ *      persis dari docs Cloudflare (dilarang diproksi/di-cache).
+ *    - `appearance: "interaction-only"`: tidak terlihat bagi hampir semua pengunjung; kotak
+ *      centang hanya muncul bila Cloudflare meminta interaksi, dan itu iframe Cloudflare yang
+ *      bisa dijangkau Tab & pembaca layar. `language: "id"`, `theme: "auto"`.
+ *    - Token sekali pakai: setelah SETIAP balasan (sukses maupun gagal) widget di-`reset`
+ *      supaya kiriman berikutnya membawa token baru.
+ *    - Tanpa token, kiriman TIDAK berangkat: `pemeriksaan.menunggu` tampil di kotak hasil
+ *      beserta tombol WhatsApp (jalur yang tidak pernah bergantung Cloudflare), isian utuh.
+ *    - Nama prop/kunci netral (aturan 9).
  *
  * SATU RISIKO YANG SENGAJA DITERIMA, BUKAN TERLUPAKAN (G-21b):
  * pengunjung dengan JavaScript AKTIF tapi chunk berkas ini gagal dimuat permanen
@@ -236,13 +251,70 @@ const gayaJebakan = {
   overflow: "hidden",
 } as const;
 
+// ————————————————————————————————————————————————————————————————
+// Turnstile (aturan 12 di kepala berkas)
+// ————————————————————————————————————————————————————————————————
+type OpsiWidget = {
+  sitekey: string;
+  action: string;
+  appearance: "interaction-only";
+  size: "flexible";
+  theme: "auto";
+  language: string;
+  callback: (token: string) => void;
+  "expired-callback": () => void;
+  "error-callback": () => boolean;
+  "timeout-callback": () => void;
+};
+type ApiTurnstile = {
+  render: (wadah: HTMLElement, opsi: OpsiWidget) => string | undefined;
+  reset: (id: string) => void;
+  remove: (id: string) => void;
+};
+
+/** URL persis dari docs Cloudflare (render eksplisit). Dilarang diproksi atau di-cache. */
+const URL_API_TURNSTILE = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+
+let muatApi: Promise<ApiTurnstile> | null = null;
+
+/** Muat api.js sekali per halaman; disisipkan skrip ber-nonce → diizinkan 'strict-dynamic'. */
+function muatTurnstile(): Promise<ApiTurnstile> {
+  const ada = (window as { turnstile?: ApiTurnstile }).turnstile;
+  if (ada) return Promise.resolve(ada);
+  muatApi ??= new Promise<ApiTurnstile>((selesai, gagal) => {
+    const skrip = document.createElement("script");
+    skrip.src = URL_API_TURNSTILE;
+    skrip.async = true;
+    skrip.onload = () => {
+      const api = (window as { turnstile?: ApiTurnstile }).turnstile;
+      if (api) selesai(api);
+      else gagal(new Error("turnstile"));
+    };
+    skrip.onerror = () => {
+      muatApi = null; // izinkan percobaan ulang pada pemasangan berikutnya
+      gagal(new Error("turnstile"));
+    };
+    document.head.appendChild(skrip);
+  });
+  return muatApi;
+}
+
 /**
  * `tombolWa` = tombol WhatsApp yang SUDAH DIRENDER DI SERVER oleh <HalamanKontak>
  * (<WaButton> dengan label dan pesan prefill dari `kontak.penutup.primer`). Dioper
  * sebagai elemen, bukan dirakit di sini — alasannya aturan 7 di kepala berkas.
  * Dipakai di dua tempat: kotak hasil pengiriman dan <noscript>.
  */
-export function FormKontak({ copy, tombolWa }: { copy: FormKontakCopy; tombolWa: ReactNode }) {
+export function FormKontak({
+  copy,
+  tombolWa,
+  kunciPemeriksaan,
+}: {
+  copy: FormKontakCopy;
+  tombolWa: ReactNode;
+  /** Site key Turnstile dari env server (G-43); `undefined` = pemeriksaan mati. */
+  kunciPemeriksaan?: string;
+}) {
   const id = useId();
   const idNama = `${id}-nama`;
   const idKontak = `${id}-kontak`;
@@ -308,6 +380,57 @@ export function FormKontak({ copy, tombolWa }: { copy: FormKontakCopy; tombolWa:
    */
   const sedangKirim = useRef(false);
 
+  // Aturan 12: token Turnstile terakhir (kosong = belum ada / kedaluwarsa / sudah dipakai).
+  const [tokenPemeriksaan, setTokenPemeriksaan] = useState("");
+  const wadahPemeriksaanRef = useRef<HTMLDivElement>(null);
+  const idWidget = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!kunciPemeriksaan) return;
+    let batal = false;
+    muatTurnstile()
+      .then((api) => {
+        const wadah = wadahPemeriksaanRef.current;
+        if (batal || !wadah || idWidget.current) return;
+        idWidget.current =
+          api.render(wadah, {
+            sitekey: kunciPemeriksaan,
+            action: AKSI_PEMERIKSAAN,
+            appearance: "interaction-only",
+            size: "flexible",
+            theme: "auto",
+            language: "id",
+            callback: (token) => setTokenPemeriksaan(token),
+            "expired-callback": () => setTokenPemeriksaan(""),
+            "timeout-callback": () => setTokenPemeriksaan(""),
+            // `true` = galat sudah ditangani di sini (Cloudflare tidak melempar ke konsol);
+            // widget mencoba ulang sendiri, dan kiriman tertahan `pemeriksaan.menunggu`.
+            "error-callback": () => {
+              setTokenPemeriksaan("");
+              return true;
+            },
+          }) ?? null;
+      })
+      .catch(() => {
+        // Skrip gagal dimuat (jaringan/pemblokir): kiriman tertahan `pemeriksaan.menunggu`,
+        // tombol WhatsApp tetap ada. Tidak ada lagi yang bisa dilakukan di sini.
+      });
+    return () => {
+      batal = true;
+      const id = idWidget.current;
+      idWidget.current = null;
+      if (id) (window as { turnstile?: ApiTurnstile }).turnstile?.remove(id);
+    };
+  }, [kunciPemeriksaan]);
+
+  /** Token sekali pakai → minta token baru setelah setiap balasan (aturan 12). */
+  function segarkanPemeriksaan() {
+    if (!kunciPemeriksaan) return;
+    setTokenPemeriksaan("");
+    const id = idWidget.current;
+    if (id) (window as { turnstile?: ApiTurnstile }).turnstile?.reset(id);
+  }
+
   /**
    * Lapis 5b: penjaga `submit` fase capture.
    *
@@ -369,6 +492,13 @@ export function FormKontak({ copy, tombolWa }: { copy: FormKontakCopy; tombolWa:
       return;
     }
 
+    if (kunciPemeriksaan && !tokenPemeriksaan) {
+      // Aturan 12: tanpa token kiriman tidak berangkat; isian utuh, WhatsApp tetap ditawarkan.
+      setHasil(copy.pemeriksaan.menunggu);
+      setRondeHasil((n) => n + 1);
+      return;
+    }
+
     sedangKirim.current = true;
     setMengirim(true);
     try {
@@ -378,7 +508,15 @@ export function FormKontak({ copy, tombolWa }: { copy: FormKontakCopy; tombolWa:
         // `sejakDibuka` = aturan 10 di kepala berkas. Diukur di sini, bukan saat
         // isian pertama diketik: yang ingin dibedakan server adalah "halaman baru
         // dibuka lalu langsung dikirim", bukan lama-tidaknya mengetik.
-        body: JSON.stringify({ nama, kontak, produk, pesan, website, sejakDibuka: msSejakDibuka() }),
+        body: JSON.stringify({
+          nama,
+          kontak,
+          produk,
+          pesan,
+          website,
+          sejakDibuka: msSejakDibuka(),
+          ...(kunciPemeriksaan ? { "cf-turnstile-response": tokenPemeriksaan } : {}),
+        }),
       });
 
       // Pemetaan status → copy: tabel di content/copy/kontak.ts. Jangan
@@ -418,6 +556,7 @@ export function FormKontak({ copy, tombolWa }: { copy: FormKontakCopy; tombolWa:
       sedangKirim.current = false;
       setMengirim(false);
       setRondeHasil((n) => n + 1);
+      segarkanPemeriksaan();
     }
   }
 
@@ -637,6 +776,13 @@ export function FormKontak({ copy, tombolWa }: { copy: FormKontakCopy; tombolWa:
           "tombol default", tombol ini WAJIB tetap satu-satunya <button
           type="submit"> di dalam <form>: menambah yang kedua memindahkan status
           itu ke tombol lain dan membuka lagi jalur Enter. */}
+      {/* Wadah widget Turnstile (aturan 12). Hanya ada bila pemeriksaan aktif; dengan
+          `interaction-only` tingginya nol kecuali Cloudflare meminta interaksi. SENGAJA tanpa
+          margin: Cloudflare mengisi wadah dengan elemen tersembunyi, jadi `:empty` tidak pernah
+          berlaku dan margin apa pun menjadi celah kosong permanen di atas tombol (terukur
+          Playwright: jarak teks privasi → tombol 24 → ±48 px). */}
+      {kunciPemeriksaan ? <div ref={wadahPemeriksaanRef} /> : null}
+
       <button
         type="submit"
         disabled={!siap || mengirim}
