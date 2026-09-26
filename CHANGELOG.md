@@ -5,6 +5,10 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ## [Unreleased]
 
+### Security
+
+- G-42 (2026-09-26, keputusan owner; menutup **H-1** audit ulang G-19): `lib/anggaran-kirim.ts` — anggaran kirim in-memory untuk `/api/lead`: ember token situs (ledakan 8, terisi 20/jam) + jendela geser 60 menit (≤ 20) + atap 3/hari per IP; penolakan satu atap tidak memakan jatah atap lain. Konstanta `ANGGARAN_KIRIM` di `app/api/lead/batas.ts`, di bawah batas mailbox `info@` (30/jam, ledakan 10): kiriman ≤ 10 + 30·t/jam untuk setiap selang t. Uji `tests/unit/anggaran-kirim.test.ts` (8).
+
 ### Changed
 
 - G-41 (2026-09-26, keputusan owner): form `/kontak` → `POST /api/lead` kini meneruskan lead lewat **email SMTP (kanal primer)** ke `info@bimacreative.tech` dan webhook `LEAD_WEBHOOK_URL` sebagai kanal tambahan opsional, paralel. Email aktif → 200 hanya bila email terkirim (webhook gagal dicatat, tidak fatal); hanya webhook → perilaku lama; tanpa kanal → 503 (ADR 2026-08-25 tetap). Semua pagar lama (zod, honeypot + penyamaran waktu G-19, Origin/Host, `application/json`, rate limit, `BATAS_ISIAN`, kutip spreadsheet untuk webhook) tidak diubah; cincin waktu jebakan kini mengukur penerusan seluruhnya. Menggantikan G-17 ("`LEAD_WEBHOOK_URL` WAJIB").
