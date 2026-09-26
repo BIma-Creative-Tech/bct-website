@@ -10,6 +10,7 @@ import { DaftarPoin } from "./daftar-poin";
 import { HeroHalaman } from "./hero-halaman";
 import { KepalaSection } from "./kepala-section";
 import { SectionHalaman } from "./section-halaman";
+import { propsReveal } from "@/components/reveal";
 
 /**
  * Susunan lengkap halaman /tentang.
@@ -59,7 +60,8 @@ export function HalamanTentang({ copy }: { copy: TentangCopy }) {
           {copy.visiMisi.map((item, i) => (
             <li
               key={item.judul}
-              className={kelas("muncul-saat-gulir rounded-2xl border border-line bg-bg p-6", kartuInteraktif)}
+              {...propsReveal(i)}
+              className={kelas("rounded-2xl border border-line bg-bg p-6", kartuInteraktif)}
             >
               <h2 id={idJudulVisiMisi[i]} className="font-display text-2xl font-extrabold text-ink">
                 {item.judul}

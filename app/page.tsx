@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { AngkaStatistik } from "@/components/angka-statistik";
 import { BlobLatar } from "@/components/blob-latar";
 import { CahayaKursor } from "@/components/cahaya-kursor";
 import { Eyebrow } from "@/components/eyebrow";
+import { HeroAnimator } from "@/components/hero-animator";
+import { Icon } from "@/components/icon";
 import {
   IkonBidang,
   IkonTeknologiDeret,
@@ -12,20 +15,17 @@ import {
 } from "@/components/ikon-teknologi";
 import { JudulSorot } from "@/components/judul-sorot";
 import { LinkButton } from "@/components/link-button";
-import {
-  chipIkon,
-  fokusRing,
-  kartuInteraktif,
-  kelas,
-  nomorBesar,
-  tautanTeks,
-  wadah,
-} from "@/components/styles";
+import { propsReveal } from "@/components/reveal";
+import { BlokCtaPenutup, DaftarBukti } from "@/components/sections";
+import { MarqueePauseButton } from "@/components/sections/marquee-pause-button";
+import { kartuInteraktif, kelas, nomorBesar, tautanTeks, wadah } from "@/components/styles";
+import { AnimatedGridPattern } from "@/components/ui-21st/animated-grid-pattern";
+import { BentoCard, BentoGrid } from "@/components/ui-21st/bento-grid";
+import { Marquee } from "@/components/ui-21st/marquee";
 import { WaButton } from "@/components/wa-button";
 import { beranda } from "@/content/copy";
 import { ruteHidup, tautanHidup } from "@/content/rute";
-import { bukti, produk, site, statistik, type Paket, type SlugProduk } from "@/content/site";
-import { Icon } from "@/components/icon";
+import { produk, site, statistik, type Paket, type SlugProduk } from "@/content/site";
 
 /**
  * Beranda.
@@ -67,30 +67,12 @@ export const metadata: Metadata = {
   },
 };
 
-/**
- * Angka & label bukti berasal dari `bukti[]` (content/site.ts); kalimat penjelas
- * dari `beranda.bukti.detail`. Pasangannya ditentukan `kunci`, BUKAN posisi array
- * (G-24): urutan baris di content/site.ts hanya mengatur urutan tayang, jadi
- * menukarnya tidak bisa lagi memindahkan paragraf ke angka yang salah.
- *
- * Tidak ada penjagaan `undefined` di sini karena tidak bisa ada: `detail` bertipe
- * `Record<KunciBukti, string>` yang total terhadap `bukti[]`, jadi butir tanpa
- * kalimat ditolak `tsc`/`next build` jauh sebelum halaman ini dirender.
- */
-const daftarBukti = bukti.map((item) => ({
-  kunci: item.kunci,
-  angka: item.angka,
-  label: item.label,
-  detail: beranda.bukti.detail[item.kunci],
-}));
-
 // "Lihat Portofolio Kami": ke /studi-kasus bila rutenya sudah hidup (content/rute.ts),
 // selama belum — jangkar ke section rekam jejak di halaman ini (W2-03).
 const hrefPortofolio = ruteHidup(beranda.hero.portofolio.href)
   ? beranda.hero.portofolio.href
   : beranda.hero.portofolio.hrefSementara;
 const tautanBukti = tautanHidup(beranda.bukti.tautan);
-const penutupSekunder = tautanHidup(beranda.penutup.sekunder);
 
 /** Ikon chip kartu produk per slug. `Record<SlugProduk, …>`: produk baru tanpa ikon = build gagal. */
 const IKON_PRODUK: Record<SlugProduk, NamaIkon> = {
@@ -103,13 +85,30 @@ const kelasJudulSection = "mt-5 max-w-[22ch] font-display text-3xl font-extrabol
 const kelasParagrafSection = "mt-4 max-w-[65ch] text-ink-2";
 const kelasBarisTombol = "mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center";
 
+/**
+ * Tata letak bento produk (lg: 3 kolom): kartu pertama tinggi di kiri (2 baris), dua kartu
+ * lain melebar di kanan. Indeks, bukan slug, agar produk keempat tetap mendapat sel wajar.
+ */
+const SEL_BENTO = ["lg:row-span-2", "lg:col-span-2", "md:col-span-2"];
+
+/** Latar dekoratif kartu bento — hanya token aksen-lembut (satu aksen merah). */
+const LATAR_BENTO = [
+  "bg-[radial-gradient(circle_at_85%_0%,var(--accent-soft),transparent_60%)]",
+  "bg-[radial-gradient(circle_at_100%_100%,var(--accent-soft),transparent_55%)]",
+  "bg-[linear-gradient(135deg,var(--accent-soft),transparent_55%)]",
+];
+
 export default function Home() {
   return (
     <>
       {/* ---------- Hero ----------
           Foto developer (Unsplash, Arif Riyanto — lihat ADR 2026-09-24) + selubung
           gelap + ikon bidang kerja. `.tema-gelap` membuat blok ini selalu bertema
-          gelap agar teks di atas foto terbaca di light maupun dark mode. */}
+          gelap agar teks di atas foto terbaca di light maupun dark mode.
+          Intro (G-38): <HeroAnimator> anime.js (WAAPI, saat idle) — teks TIDAK pernah
+          disembunyikan (LCP = paint pertama); baris `data-hero-init="lift"` diberi gerak
+          angkat bertahap. Grid (G-39, 21st.dev Animated Grid Pattern) di atas selubung,
+          dimask ke sisi kanan (area foto) agar tidak mengganggu teks; kotak berkedip hanya md+. */}
       <section aria-labelledby="judul-hero" className="tema-gelap relative isolate overflow-hidden bg-bg">
         <Image
           src="/hero/beranda-developer.jpg"
@@ -120,107 +119,144 @@ export default function Home() {
           className="-z-20 object-cover object-[70%_45%]"
         />
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-selubung-rata lg:bg-selubung-foto" />
-        {/* Efek referensi v0 (G-29): blob aksen berdenyut + cahaya pengikut kursor. */}
-        <BlobLatar />
+        <AnimatedGridPattern
+          numSquares={20}
+          maxOpacity={0.18}
+          duration={3}
+          animateMedia="(min-width: 768px)"
+          className="-z-10 opacity-50 mask-[radial-gradient(640px_circle_at_85%_35%,white,transparent)]"
+        />
         <CahayaKursor />
         <IkonTeknologiMelayang />
 
-        {/* Isi hero muncul bertahap (muncul-naik + jeda 0/100/200/300/400 ms);
-            semuanya `motion-safe:` — pengunjung reduced-motion langsung melihat utuh. */}
-        <div className={kelas(wadah, "relative py-16 sm:py-24 lg:py-28")}>
+        <HeroAnimator className={kelas(wadah, "relative py-16 sm:py-24 lg:py-28")}>
           <IkonTeknologiDeret />
           {/* Badge pill (pola referensi) menggantikan eyebrow bergaris khusus di hero.
               Teks: copy + lokasi dari content/site.ts. */}
-          <p className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-2 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-accent motion-safe:animate-muncul-naik">
+          <p
+            data-hero-init="lift"
+            className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-2 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-accent"
+          >
             <IkonBidang nama="kilau" size={16} />
             {/* Lokasi hanya disambung bila diisi — `site.location` boleh kosong. */}
             <span>{[beranda.hero.eyebrow, site.location].filter(Boolean).join(" · ")}</span>
           </p>
           <h1
             id="judul-hero"
-            className="mt-6 max-w-[20ch] text-4xl font-extrabold text-ink sm:text-5xl lg:text-6xl motion-safe:animate-muncul-naik motion-safe:[animation-delay:100ms]"
+            data-hero-init="lift"
+            className="mt-6 max-w-[20ch] text-4xl font-extrabold text-ink sm:text-5xl lg:text-6xl"
           >
             <JudulSorot judul={beranda.hero.judul} sorot={beranda.hero.judulSorot} />
           </h1>
-          <p className="mt-6 max-w-[58ch] text-lg text-ink-2 motion-safe:animate-muncul-naik motion-safe:[animation-delay:200ms]">
+          <p data-hero-init="lift" className="mt-6 max-w-[58ch] text-lg text-ink-2">
             {beranda.hero.teks}
           </p>
-          <div
-            className={kelas(
-              kelasBarisTombol,
-              "motion-safe:animate-muncul-naik motion-safe:[animation-delay:300ms]",
-            )}
-          >
+          <div data-hero-init="lift" className={kelasBarisTombol}>
             <WaButton pesan={beranda.hero.primer.pesan} panah>
               {beranda.hero.primer.label}
             </WaButton>
             <LinkButton href={hrefPortofolio}>{beranda.hero.portofolio.label}</LinkButton>
           </div>
 
-          {/* Statistik dari `statistik[]` (content/site.ts). <dt> ditulis lebih dulu
-              demi semantik, angka ditampilkan di atas lewat flex-col-reverse. Titik
-              berdenyut = pola referensi, dekoratif. */}
-          <dl className="mt-12 grid max-w-2xl grid-cols-3 gap-4 border-t border-line pt-8 sm:gap-8 motion-safe:animate-muncul-naik motion-safe:[animation-delay:400ms]">
+          {/* Statistik dari `statistik[]` (content/site.ts), angka lewat Number Ticker
+              (21st.dev, G-39): server merender nilai akhir; hitung naik hanya bila baris ini
+              masih di bawah layar saat idle (mis. HP) — yang sudah terlihat tidak diubah.
+              <dt> ditulis lebih dulu demi semantik, angka tampil di atas (flex-col-reverse). */}
+          <dl
+            data-hero-init="lift"
+            className="mt-12 grid max-w-2xl grid-cols-3 gap-4 border-t border-line pt-8 sm:gap-8"
+          >
             {statistik.map((item, i) => (
               <div key={item.kunci} className="flex flex-col-reverse gap-1">
                 <dt className="flex items-center gap-2 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-2 sm:text-xs">
-                  <span
-                    aria-hidden="true"
-                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent motion-safe:animate-pulse"
-                    style={{ animationDelay: `${i * 500}ms` }}
-                  />
+                  <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
                   {item.label}
                 </dt>
-                <dd className="font-display text-2xl font-extrabold text-ink sm:text-4xl">{item.angka}</dd>
+                <dd className="font-display text-2xl font-extrabold text-ink sm:text-4xl">
+                  <AngkaStatistik teks={item.angka} urutan={i} />
+                </dd>
               </div>
             ))}
           </dl>
-        </div>
+        </HeroAnimator>
 
         {/* Pita gradien merek di tepi bawah hero. */}
         <div aria-hidden="true" className="h-1.5 bg-gradien" />
       </section>
 
-      {/* ---------- Tiga lini produk ---------- */}
+      {/* ---------- Pita teknologi (Marquee 21st.dev, G-39) ----------
+          Isi = teknologi yang sudah disebut copy produk (content/copy/beranda.ts). Jeda:
+          tombol (WCAG 2.2.2), hover, dan fokus; reduced motion → diam, satu salinan, bisa
+          digulir. Server component; hanya tombol jeda yang client. */}
+      <section aria-labelledby="judul-teknologi" className="border-b border-line bg-surface">
+        <div className={kelas(wadah, "flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:gap-6")}>
+          <h2
+            id="judul-teknologi"
+            className="shrink-0 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-ink-2"
+          >
+            {beranda.teknologi.label}
+          </h2>
+          <div
+            id="pita-teknologi"
+            className="relative min-w-0 flex-1 [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)] motion-reduce:[mask-image:none]"
+          >
+            <Marquee pauseOnHover repeat={4} durasi={30}>
+              <ul className="flex shrink-0 gap-(--gap)">
+                {beranda.teknologi.item.map((nama) => (
+                  <li
+                    key={nama}
+                    className="whitespace-nowrap rounded-full border border-line bg-bg px-4 py-1.5 font-mono text-xs text-ink"
+                  >
+                    {nama}
+                  </li>
+                ))}
+              </ul>
+            </Marquee>
+          </div>
+          <MarqueePauseButton
+            targetId="pita-teknologi"
+            labelJeda={beranda.teknologi.jeda}
+            labelPutar={beranda.teknologi.putar}
+          />
+        </div>
+      </section>
+
+      {/* ---------- Tiga lini produk: Bento Grid (21st.dev, G-39) ---------- */}
       <section aria-labelledby="judul-produk" className="relative isolate overflow-hidden">
         <BlobLatar posisi="kanan-atas" />
         <div className={kelas(wadah, "py-16 sm:py-20")}>
-        <Eyebrow>{beranda.produk.eyebrow}</Eyebrow>
-        <h2 id="judul-produk" className={kelasJudulSection}>
-          {beranda.produk.judul}
-        </h2>
-        {beranda.produk.teks ? <p className={kelasParagrafSection}>{beranda.produk.teks}</p> : null}
+          <Eyebrow>{beranda.produk.eyebrow}</Eyebrow>
+          <h2 id="judul-produk" className={kelasJudulSection}>
+            {beranda.produk.judul}
+          </h2>
+          {beranda.produk.teks ? <p className={kelasParagrafSection}>{beranda.produk.teks}</p> : null}
 
-        <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {produk.map((item) => {
-            // Paket pertama = paket masuk untuk lini ini. Harga TIDAK PERNAH
-            // diketik di komponen, selalu dari content/site.ts.
-            // Anotasi `Paket | undefined` disengaja: `produk[]` kini `as const`, jadi
-            // tanpa anotasi tipe elemennya menyempit ke objek literal per paket dan
-            // `satuan` (opsional, tidak ada di semua paket) hilang dari union.
-            const paketMasuk: Paket | undefined = item.paket.at(0);
-            return (
-              <li key={item.slug} className="muncul-saat-gulir flex">
-                <Link
+          <BentoGrid className="mt-10 lg:auto-rows-[minmax(13rem,auto)]">
+            {produk.map((item, i) => {
+              // Paket pertama = paket masuk untuk lini ini. Harga TIDAK PERNAH
+              // diketik di komponen, selalu dari content/site.ts.
+              // Anotasi `Paket | undefined` disengaja: `produk[]` kini `as const`, jadi
+              // tanpa anotasi tipe elemennya menyempit ke objek literal per paket dan
+              // `satuan` (opsional, tidak ada di semua paket) hilang dari union.
+              const paketMasuk: Paket | undefined = item.paket.at(0);
+              return (
+                <BentoCard
+                  key={item.slug}
                   href={`/produk/${item.slug}`}
-                  className={kelas(
-                    "group flex w-full flex-col rounded-2xl border border-line bg-surface/80 p-6 backdrop-blur-sm",
-                    kartuInteraktif,
-                    fokusRing,
-                  )}
-                >
-                  <span className={kelas(chipIkon, "mb-5 self-start")}>
-                    <IkonBidang nama={IKON_PRODUK[item.slug]} type="bulk" />
-                  </span>
-                  <h3 className="flex items-start justify-between gap-3 font-display text-xl font-bold text-ink group-hover:text-accent motion-safe:transition-colors">
-                    {item.nama}
+                  nama={item.nama}
+                  deskripsi={item.ringkas}
+                  className={SEL_BENTO[i] ?? ""}
+                  liProps={propsReveal(i)}
+                  ikon={<IkonBidang nama={IKON_PRODUK[item.slug]} type="bulk" />}
+                  latar={<div className={kelas("absolute inset-0", LATAR_BENTO[i % LATAR_BENTO.length])} />}
+                  panah={
                     <Icon
                       name="arrow-right-02"
                       size={20}
                       className="mt-1 text-muted group-hover:text-accent motion-safe:transition motion-safe:group-hover:translate-x-1"
                     />
-                  </h3>
-                  <p className="mt-3 flex-1 text-sm text-ink-2">{item.ringkas}</p>
+                  }
+                >
                   {paketMasuk ? (
                     <p className="mt-6 border-t border-line pt-4 font-mono">
                       <span className="block text-xs uppercase tracking-[0.14em] text-muted">
@@ -232,17 +268,17 @@ export default function Home() {
                       </span>
                     </p>
                   ) : null}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                </BentoCard>
+              );
+            })}
+          </BentoGrid>
         </div>
       </section>
 
       {/* ---------- Bukti / rekam jejak ---------- */}
       {/* id="rekam-jejak" = tujuan sementara tombol "Lihat Portofolio Kami" di hero;
-          scroll-mt memberi ruang untuk header sticky (h-20 + pita). */}
+          scroll-mt memberi ruang untuk header sticky (h-20 + pita). Angka + kalimat penjelas
+          lewat <DaftarBukti detail> — komponen yang sama dengan /tentang (pasangan `kunci`, G-24). */}
       <section
         id="rekam-jejak"
         aria-labelledby="judul-bukti"
@@ -256,17 +292,7 @@ export default function Home() {
           <p className={kelasParagrafSection}>{beranda.bukti.kepala.teks}</p>
         ) : null}
 
-        <ul className="mt-10 grid gap-8 sm:grid-cols-3">
-          {daftarBukti.map((item) => (
-            <li key={item.kunci} className="muncul-saat-gulir border-t border-line pt-5">
-              <h3 className="font-display text-2xl font-extrabold text-ink">{item.angka}</h3>
-              <p className="mt-2 font-mono text-xs uppercase tracking-[0.14em] text-muted">
-                {item.label}
-              </p>
-              <p className="mt-4 max-w-[65ch] text-sm text-ink-2">{item.detail}</p>
-            </li>
-          ))}
-        </ul>
+        <DaftarBukti detail={beranda.bukti.detail} />
 
         {tautanBukti ? (
           <p className="mt-10">
@@ -292,11 +318,12 @@ export default function Home() {
               dekoratif karena urutan sudah disampaikan <ol>. Kartu berlatar `bg`
               karena section ini pita surface. */}
           <ol className="mt-10 grid gap-4 sm:grid-cols-2">
-            {beranda.caraKerja.langkah.map((langkah) => (
+            {beranda.caraKerja.langkah.map((langkah, i) => (
               <li
                 key={langkah.nomor}
+                {...propsReveal(i)}
                 className={kelas(
-                  "muncul-saat-gulir group relative overflow-hidden rounded-2xl border border-line bg-bg p-6 pt-16",
+                  "group relative overflow-hidden rounded-2xl border border-line bg-bg p-6 pt-16",
                   kartuInteraktif,
                 )}
               >
@@ -313,29 +340,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ---------- Penutup / CTA ---------- */}
-      <section aria-labelledby="judul-penutup" className={kelas(wadah, "py-16 sm:py-24")}>
-        <div className="muncul-saat-gulir relative isolate overflow-hidden rounded-3xl border border-line bg-surface">
-          <BlobLatar posisi="kanan-atas" />
-          {/* Pita gradien di tepi atas kartu — sama dengan <BlokCtaPenutup>. */}
-          <div aria-hidden="true" className="h-1.5 bg-gradien" />
-          <div className="p-8 sm:p-12">
-            <Eyebrow>{beranda.penutup.eyebrow}</Eyebrow>
-            <h2 id="judul-penutup" className={kelasJudulSection}>
-              {beranda.penutup.judul}
-            </h2>
-            <p className={kelasParagrafSection}>{beranda.penutup.teks}</p>
-            <div className={kelasBarisTombol}>
-              <WaButton pesan={beranda.penutup.primer.pesan} panah>
-                {beranda.penutup.primer.label}
-              </WaButton>
-              {penutupSekunder ? (
-                <LinkButton href={penutupSekunder.href}>{penutupSekunder.label}</LinkButton>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* ---------- Penutup / CTA ----------
+          Sama persis dengan halaman lain: <BlokCtaPenutup> (tautan sekunder disaring
+          `tautanHidup()` di dalamnya). */}
+      <BlokCtaPenutup cta={beranda.penutup} idJudul="judul-penutup" />
     </>
   );
 }

@@ -1,7 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { LinkButton } from "@/components/link-button";
-import { SectionHalaman, kelasBarisTombol, kelasJudulSection } from "@/components/sections";
+// Impor langsung (bukan barrel @/components/sections): barrel mengekspor <HeroHalaman> yang
+// memuat pulau client <HeroAnimator>/<AnimatedGridSquares> — 404 tidak merendernya (G-38).
+import { kelasBarisTombol, kelasJudulSection } from "@/components/sections/kelas-section";
+import { SectionHalaman } from "@/components/sections/section-halaman";
+import { propsReveal } from "@/components/reveal";
 import { fokusRing, kelas } from "@/components/styles";
 import { WaButton } from "@/components/wa-button";
 import { tidakDitemukan } from "@/content/copy";
@@ -120,8 +124,8 @@ export default function TidakDitemukan() {
           {tidakDitemukan.judulTautanBantu}
         </h2>
         <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {tautanProduk.map((item) => (
-            <li key={item.slug} className="flex">
+          {tautanProduk.map((item, i) => (
+            <li key={item.slug} {...propsReveal(i)} className="flex">
               <Link
                 href={item.href}
                 className={kelas(

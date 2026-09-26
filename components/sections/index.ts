@@ -19,6 +19,12 @@
  * — 7 → 8 <script src> per halaman. Jangan mengandalkan tree-shaking untuk
  * membuangnya: pada build produksi Next.js 16 + Turbopack ia terbukti TIDAK terjadi.
  *
+ * PENGECUALIAN SADAR (G-38/G-39, 2026-09-26): <HeroHalaman> kini merender pulau client kecil
+ * <HeroAnimator> (anime.js di-import dinamis saat idle) dan <AnimatedGridSquares>. Itu boleh
+ * karena SETIAP pengimpor barrel (/pricing, /tentang, /kontak, /produk/* ×3) memang merender
+ * <HeroHalaman>; beranda memakai keduanya sendiri, dan app/not-found.tsx sengaja mengimpor
+ * langsung dari berkasnya. Pengimpor baru yang tidak merender <HeroHalaman> wajib impor langsung.
+ *
  * Karena itu `FormKontak` DAN `HalamanKontak` tidak ada di daftar bawah. Halaman
  * /kontak mengimpor `HalamanKontak` langsung dari
  * `@/components/sections/halaman-kontak`. Komponen baru yang ber-`"use client"`,

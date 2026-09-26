@@ -1,11 +1,12 @@
 /**
  * Judul dengan satu kata disorot warna aksen + coretan garis bawah yang "digambar"
- * dari kiri (pola referensi v0, G-29).
+ * dari kiri (pola referensi v0, G-29). Sejak G-38 coretannya digambar anime.js
+ * (<HeroAnimator>, `scaleX` compositor) — bukan lagi `stroke-dashoffset` CSS (paint).
  *
  * Teks utuh tetap satu string dari copy; komponen hanya memecahnya di kemunculan
  * pertama `sorot`. Bila `sorot` tidak ada di `judul`, judul tampil polos — jadi
  * salah ketik di copy tidak pernah menghilangkan teks. Coretannya `aria-hidden`
- * dan animasinya `motion-safe:` (reduced-motion: garis langsung utuh).
+ * dan animasinya hanya jalan tanpa prefers-reduced-motion (garis langsung utuh).
  */
 export function JudulSorot({ judul, sorot }: { judul: string; sorot: string }) {
   const i = sorot ? judul.indexOf(sorot) : -1;
@@ -27,17 +28,16 @@ export function JudulSorot({ judul, sorot }: { judul: string; sorot: string }) {
           aria-hidden="true"
           viewBox="0 0 200 12"
           preserveAspectRatio="none"
-          className="absolute -bottom-2 left-0 h-3 w-full"
+          data-hero-init="underline"
+          className="absolute -bottom-2 left-0 h-3 w-full origin-left"
           fill="none"
         >
           <path
             d="M2 10C50 5 150 5 198 10"
-            pathLength={100}
             stroke="currentColor"
             strokeWidth={3}
             strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
-            className="[stroke-dasharray:100] motion-safe:animate-gambar-garis"
           />
         </svg>
       </span>

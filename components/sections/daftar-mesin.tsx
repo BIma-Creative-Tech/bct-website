@@ -1,5 +1,6 @@
 import { kartuInteraktif, kelas, nomorBesar } from "@/components/styles";
 import type { MesinBisnis } from "@/content/copy";
+import { propsReveal } from "@/components/reveal";
 
 /**
  * Tiga "mesin bisnis" BCT (/tentang) — daftar bernomor.
@@ -16,11 +17,12 @@ export function DaftarMesin({ item }: { item: MesinBisnis[] }) {
   // `bg` karena /tentang memasang section ini di pita surface.
   return (
     <ol className="mt-10 grid gap-4 md:grid-cols-3">
-      {item.map((mesin) => (
+      {item.map((mesin, i) => (
         <li
           key={mesin.nomor}
+          {...propsReveal(i)}
           className={kelas(
-            "muncul-saat-gulir group relative overflow-hidden rounded-2xl border border-line bg-bg p-6 pt-16",
+            "group relative overflow-hidden rounded-2xl border border-line bg-bg p-6 pt-16",
             kartuInteraktif,
           )}
         >

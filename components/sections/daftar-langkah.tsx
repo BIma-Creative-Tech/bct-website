@@ -1,5 +1,6 @@
 import { kartuInteraktif, kelas, nomorBesar } from "@/components/styles";
 import type { Langkah } from "@/content/copy";
+import { propsReveal } from "@/components/reveal";
 
 /**
  * Langkah bernomor (section "cara kerja"). Nomornya datang dari copy, bukan dari index.
@@ -12,11 +13,12 @@ import type { Langkah } from "@/content/copy";
 export function DaftarLangkah({ langkah }: { langkah: Langkah[] }) {
   return (
     <ol className="mt-10 grid gap-4 sm:grid-cols-2">
-      {langkah.map((item) => (
+      {langkah.map((item, i) => (
         <li
           key={item.nomor}
+          {...propsReveal(i)}
           className={kelas(
-            "muncul-saat-gulir group relative overflow-hidden rounded-2xl border border-line bg-surface p-6 pt-16",
+            "group relative overflow-hidden rounded-2xl border border-line bg-surface p-6 pt-16",
             kartuInteraktif,
           )}
         >
