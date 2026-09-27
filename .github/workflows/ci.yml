@@ -207,7 +207,7 @@ jobs:
           code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
           for _ in $(seq 1 30); do curl -fsS "$b/api/health" && break; sleep 1; done
           test "$(curl -fsS "$b/api/health")" = '{"status":"ok"}'
-          for p in / /kontak /pricing /tentang /produk/odoo /produk/bima-insight /produk/web-apps \
+          for p in / /kontak /pricing /tentang /privasi /produk/odoo /produk/bima-insight /produk/web-apps \
                    /robots.txt /sitemap.xml /icon /opengraph-image; do
             test "$(code "$b$p")" = 200 || { echo "GAGAL $p"; exit 1; }
           done
@@ -215,6 +215,11 @@ jobs:
           curl -sI "$b/" | grep -i "content-security-policy: .*'nonce-"
           # G-15 (diadaptasi): CSP yang benar-benar dikirim image — nonce, tanpa unsafe-eval/unsafe-inline di script-src
           node scripts/check-csp.mjs "$b" / /kontak /pricing /tentang /produk/odoo /tidak-ada
+          # G-49: alamat publik info@ HANYA di /privasi (halaman dinamis → dicek di HTML runtime, bukan build)
+          curl -s "$b/privasi" | grep -q 'mailto:info@bimacreative.tech'
+          for p in / /kontak /pricing /tentang /produk/odoo /produk/bima-insight /produk/web-apps /tidak-ada; do
+            if curl -s "$b$p" | grep -q 'info@bimacreative.tech'; then echo "GAGAL: info@ terbit di $p"; exit 1; fi
+          done
           # SITE_URL=localhost → noindex + robots Disallow
           curl -s "$b/" | grep -q '<meta name="robots" content="noindex, nofollow"'
           curl -s "$b/robots.txt" | grep -q 'Disallow: /'

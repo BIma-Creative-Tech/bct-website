@@ -1,4 +1,5 @@
-import { kelas, wadah } from "@/components/styles";
+import { kelas, tautanTeks, wadah } from "@/components/styles";
+import { site } from "@/content/site";
 import type { PrivasiCopy } from "@/content/copy";
 import { BlokCtaPenutup } from "./blok-cta-penutup";
 import { BlokParagraf } from "./blok-paragraf";
@@ -11,8 +12,8 @@ import { SectionHalaman } from "./section-halaman";
  * Susunan halaman /privasi (G-48).
  *
  * Teks: `copy` (content/copy/privasi.ts). Tidak ada kalimat, alamat email, atau nomor WhatsApp
- * yang diketik di sini — jalur pertanyaan soal data = <BlokCtaPenutup> (WhatsApp lewat waLink()
- * + tautan /kontak yang disaring `tautanHidup()`), bukan alamat email (ADR 2026-08-24).
+ * yang diketik di sini. Alamat email publik (`site.emailPublik`) hanya dirender di halaman ini
+ * (keputusan owner 2026-09-27, G-49; menggantikan larangan ADR 2026-08-24 untuk /privasi saja).
  *
  * Urutan: hero > tanggal pembaruan > bagian[] (latar berselang bg/surface) > atribusi GeoLite2
  * (hanya bila `atribusiGeoLite2.tampil`) > pertanyaan soal data.
@@ -42,6 +43,15 @@ export function HalamanPrivasi({ copy }: { copy: PrivasiCopy }) {
             <BlokParagraf paragraf={bagian.paragraf} />
             {bagian.daftar ? <DaftarTanda item={bagian.daftar} className="mt-6" /> : null}
             {bagian.paragrafAkhir ? <BlokParagraf paragraf={bagian.paragrafAkhir} className="mt-6" /> : null}
+            {bagian.kalimatEmail ? (
+              <p className="mt-5 max-w-[65ch] text-ink-2">
+                {bagian.kalimatEmail.sebelum}{" "}
+                <a href={`mailto:${site.emailPublik}`} className={tautanTeks}>
+                  {site.emailPublik}
+                </a>
+                {bagian.kalimatEmail.sesudah}
+              </p>
+            ) : null}
           </SectionHalaman>
         );
       })}

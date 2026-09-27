@@ -13,11 +13,9 @@ import type { BlokCta, HeroCopy, KepalaSection, MetaCopy } from "./types";
  * - Analitik: draf infra plan 11 yang disetujui owner (GATE 1, 2026-09-27), substansi verbatim;
  *   hanya format yang disesuaikan dengan komponen halaman.
  *
- * ALAMAT EMAIL TIDAK PERNAH DITULIS DI SINI. Draf infra menutup bagian analitik dengan
- * "Pertanyaan terkait data dapat dikirim ke info@…", tetapi ADR 2026-08-24 melarang alamat
- * email terbit ke HTML/`mailto:` dan scripts/check-pii.mjs memfailkan build bila `PENERIMA_LEAD`
- * muncul di artefak. Kalimat itu diganti rujukan ke section `kontak` di bawah (form /kontak +
- * WhatsApp). [TANYA-OWNER] Terbitkan info@ di /privasi? Butuh ADR baru lebih dulu.
+ * ALAMAT EMAIL TIDAK DITULIS DI SINI. Owner mengizinkan info@ terbit di /privasi (2026-09-27,
+ * G-49): nilainya `site.emailPublik` (content/site.ts), dirender HalamanPrivasi di antara
+ * `kalimatEmail.sebelum` dan `.sesudah`. Di halaman lain tetap dilarang (check-pii).
  */
 
 export type BagianPrivasi = {
@@ -29,6 +27,8 @@ export type BagianPrivasi = {
   daftar?: string[];
   /** Paragraf setelah `daftar`. */
   paragrafAkhir?: string[];
+  /** Kalimat penutup berisi alamat email publik (`site.emailPublik`, hanya di /privasi — G-49). */
+  kalimatEmail?: { sebelum: string; sesudah: string };
 };
 
 export type PrivasiCopy = {
@@ -121,8 +121,12 @@ export const privasi: PrivasiCopy = {
         "Data statistik disimpan paling lama 25 bulan, lalu dihapus.",
       ],
       paragrafAkhir: [
-        "Pengolahan ini didasarkan pada kepentingan yang sah untuk memelihara dan meningkatkan layanan situs, sesuai UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi. Pertanyaan terkait data dapat dikirim lewat form di halaman kontak atau WhatsApp.",
+        "Pengolahan ini didasarkan pada kepentingan yang sah untuk memelihara dan meningkatkan layanan situs, sesuai UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi.",
       ],
+      kalimatEmail: {
+        sebelum: "Pertanyaan terkait data dapat dikirim ke",
+        sesudah: ", lewat form di halaman kontak, atau WhatsApp.",
+      },
     },
   ],
 

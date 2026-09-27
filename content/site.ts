@@ -10,6 +10,9 @@ export const site = {
   tagline: "Sistem bisnis modern untuk UKM Indonesia — ERP, dashboard AI, dan aplikasi yang dibangun cepat dan presisi.",
   whatsappNumber: "6285640718785",
   email: "am.ademaryadi@gmail.com",
+  // Alamat publik BCT (keputusan owner 2026-09-27, G-49): BOLEH terbit, tetapi HANYA di /privasi.
+  // Smoke test CI memfailkan rilis bila alamat ini muncul di HTML rute lain (G-49).
+  emailPublik: "info@bimacreative.tech",
   // Domain TIDAK lagi di sini (ADR 2026-09-26): URL publik kanonik = env `SITE_URL`
   // runtime (lib/env.ts, lib/site.ts) — metadataBase, canonical, og:url, sitemap, robots.
   location: "",

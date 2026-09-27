@@ -5,6 +5,10 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ## [Unreleased]
 
+### Changed
+
+- G-49 (2026-09-27, keputusan owner): `/privasi` menampilkan alamat publik `info@bimacreative.tech` (`site.emailPublik`, tautan `mailto:`) untuk pertanyaan soal data; smoke test CI memastikan alamat itu ada di /privasi dan tidak terbit di rute lain; `check-pii` tetap melarangnya di bundel klien.
+
 ## [0.2.0] - 2026-09-27
 
 Umami runtime (G-47, kontrak infra plan 11 disetujui owner di GATE 1 2026-09-27) + halaman `/privasi` (G-48). Tag `v0.2.0` hanya setelah owner konfirmasi.
