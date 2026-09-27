@@ -9,6 +9,8 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 Umami runtime (G-47, kontrak infra plan 11 disetujui owner di GATE 1 2026-09-27) + halaman `/privasi` (G-48). Tag `v0.2.0` hanya setelah owner konfirmasi.
 
+- Atribusi GeoLite (MaxMind) ditampilkan di /privasi — wajib menurut GeoLite EULA §3 (dicek infra 2026-09-27; G-48).
+
 ### Added
 
 - G-48 (2026-09-27, permintaan owner Q11): halaman **`/privasi`** — copy bertipe `content/copy/privasi.ts` (barrel), `<HalamanPrivasi>` (`components/sections/halaman-privasi.tsx`), `metadataHalaman` + `app/privasi/opengraph-image.tsx`, terdaftar di `RUTE_HIDUP` (sitemap 8 `<loc>`, footer "Kebijakan privasi", 404 ikut penyaring). Isi: form kontak (nama, kontak, topik, pesan → email ke kotak surat BCT + webhook opsional, tanpa database; IP hanya untuk anggaran kirim di memori), Cloudflare Turnstile "bila aktif", analitik Umami (draf infra plan 11 yang disetujui owner, substansi verbatim: tanpa cookie, IP tidak disimpan, query tidak dikirim, DNT dihormati, tidak dibagikan/dijual, retensi 25 bulan, dasar kepentingan sah UU PDP), tanggal "Terakhir diperbarui 27 September 2026". Kalimat draf "…dikirim ke info@…" diganti rujukan ke form /kontak + WhatsApp (ADR 2026-08-24 + `check-pii` — alamat email tidak pernah terbit). Atribusi GeoLite2 disiapkan sebagai `atribusiGeoLite2.tampil: false` (menunggu infra). Catatan privasi form /kontak kini menautkan "Baca kebijakan privasi" (disaring `tautanHidup()`).

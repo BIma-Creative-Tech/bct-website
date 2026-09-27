@@ -48,7 +48,7 @@ export function HalamanPrivasi({ copy }: { copy: PrivasiCopy }) {
 
       {copy.atribusiGeoLite2.tampil ? (
         <div className={wadah}>
-          <p className="max-w-[65ch] text-xs text-muted">{copy.atribusiGeoLite2.teks}</p>
+          <p className="max-w-[65ch] text-xs text-ink-2">{copy.atribusiGeoLite2.teks}</p>
         </div>
       ) : null}
 

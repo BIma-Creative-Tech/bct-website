@@ -127,8 +127,9 @@ export const privasi: PrivasiCopy = {
   ],
 
   atribusiGeoLite2: {
-    tampil: false,
-    teks: "Perkiraan negara asal kunjungan memakai data GeoLite2 buatan MaxMind, tersedia di https://www.maxmind.com.",
+    // Wajib (GeoLite EULA §3, diperbarui 2026-02-12; dicek infra 2026-09-27).
+    tampil: true,
+    teks: "Perkiraan negara asal kunjungan memakai data GeoLite yang dibuat oleh MaxMind, tersedia di https://www.maxmind.com.",
   },
 
   kontak: {
