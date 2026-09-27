@@ -46,6 +46,18 @@ export type BerandaCopy = {
   meta: MetaCopy;
   hero: BerandaHero;
   produk: KepalaSection;
+  /**
+   * Pita teknologi berjalan (Marquee 21st.dev, G-39) di bawah hero. `item` HANYA teknologi
+   * yang sudah disebut copy halaman produk (odoo.ts: Odoo Community, Next.js; web-apps.ts:
+   * Next.js, Flutter; bima-insight.ts: PostgreSQL, MySQL) — bukan logo klien, bukan klaim baru.
+   * `jeda`/`putar` = label tombol jeda animasi (WCAG 2.2.2).
+   */
+  teknologi: {
+    label: string;
+    item: string[];
+    jeda: string;
+    putar: string;
+  };
   bukti: {
     kepala: KepalaSection;
     detail: BuktiDetail;
@@ -86,6 +98,15 @@ export const beranda: BerandaCopy = {
     eyebrow: "Yang kami kerjakan",
     judul: "Tiga lini, satu tujuan: proses Anda berjalan tanpa tebak-tebakan.",
     teks: "Setiap lini punya scope dan harga tertulis. Anda bisa mulai dari bagian yang paling mendesak, bukan dari paket yang paling besar.",
+  },
+
+  // [TANYA-OWNER] Label pita & daftar teknologi ditambahkan 2026-09-26 (G-39) dari fakta copy
+  // yang sudah ada; konfirmasi bahwa daftar ini boleh tampil di beranda.
+  teknologi: {
+    label: "Teknologi yang kami pakai",
+    item: ["Odoo Community", "Next.js", "Flutter", "PostgreSQL", "MySQL"],
+    jeda: "Jeda animasi",
+    putar: "Putar animasi",
   },
 
   bukti: {

@@ -1,5 +1,6 @@
 import { kartuInteraktif, kelas } from "@/components/styles";
 import type { Poin } from "@/content/copy";
+import { propsReveal } from "@/components/reveal";
 
 /**
  * Daftar butir "judul + penjelasan" (tipe `Poin` dari content/copy).
@@ -9,10 +10,11 @@ import type { Poin } from "@/content/copy";
 export function DaftarPoin({ poin }: { poin: Poin[] }) {
   return (
     <ul className="mt-10 grid gap-4 sm:grid-cols-2">
-      {poin.map((item) => (
+      {poin.map((item, i) => (
         <li
           key={item.judul}
-          className={kelas("muncul-saat-gulir group rounded-2xl border border-line bg-surface p-6", kartuInteraktif)}
+          {...propsReveal(i)}
+          className={kelas("group rounded-2xl border border-line bg-surface p-6", kartuInteraktif)}
         >
           <h3 className="font-display text-lg font-bold text-ink group-hover:text-accent motion-safe:transition-colors">
             {item.judul}

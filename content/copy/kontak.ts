@@ -180,7 +180,7 @@ export type FormKontakCopy = {
    * | 422 (validasi zod)                        | `gagalValidasi`  |
    * | 413 (pesan terlalu besar)                 | `gagalValidasi`  |
    * | 429 (rate limit, ada header Retry-After)  | `gagalRateLimit` |
-   * | 503 (tujuan lead belum tersambung)        | `gagalBelumSiap` |
+   * | 503 (tanpa kanal / anggaran kirim habis)  | `gagalBelumSiap` |
    * | 400, 502, status lain, gagal jaringan     | `gagal`          |
    */
   sukses: string;
@@ -188,7 +188,16 @@ export type FormKontakCopy = {
   gagalRateLimit: string;
   gagalValidasi: string;
   gagalBelumSiap: string;
+  /**
+   * Pemeriksaan otomatis Cloudflare Turnstile (G-43) — hanya dipakai bila widget aktif.
+   * `menunggu`: kirim ditekan sebelum pemeriksaan memberi token (widget belum siap, atau
+   * pengunjung belum menyelesaikan tantangan interaktif). Kiriman TIDAK berangkat; isian utuh.
+   * Kunci `pemeriksaan` sengaja netral (aturan 9 di components/sections/form-kontak.tsx).
+   */
+  pemeriksaan: { menunggu: string };
   catatanPrivasi: string;
+  /** Tampil hanya bila Turnstile aktif (G-46). */
+  catatanPemeriksaan: string;
 };
 
 export type KontakCopy = {
@@ -365,12 +374,21 @@ export const kontak: KontakCopy = {
     // Catatan untuk frontend-builder: pada kondisi ini isi form JANGAN dikosongkan
     // supaya pengunjung masih bisa menyalin pesannya ke WhatsApp.
     gagalBelumSiap: "Pengiriman lewat form sedang tidak aktif, jadi pesan Anda tidak sampai ke kami. Mengirim ulang tidak akan mengubahnya. Silakan salin pesan Anda ke WhatsApp — jalur itu pasti sampai dan kami balas dari sana.",
+    // G-43: dipakai juga saat anggaran kirim situs habis (G-42) — balasannya sama-sama 503,
+    // dan kalimat `gagalBelumSiap` di atas tetap jujur untuk keadaan itu.
+    pemeriksaan: {
+      menunggu: "Pemeriksaan keamanan otomatis belum selesai, jadi pesan Anda belum dikirim. Tunggu beberapa detik lalu tekan kirim lagi — isian Anda tetap di tempatnya. Kalau tidak kunjung bisa, langsung hubungi kami lewat WhatsApp.",
+    },
     // Dasar kalimat ini: app/api/lead/route.ts tidak menyimpan data (hanya meneruskan ke
     // LEAD_WEBHOOK_URL) dan SECURITY.md butir 2 (data lead minimal, selaras UU PDP).
     // [TANYA-OWNER] Konfirmasi tujuan LEAD_WEBHOOK_URL nanti bukan tool marketing pihak
     // ketiga — kalau ternyata iya, kalimat privasi ini WAJIB diubah agar tetap jujur.
     catatanPrivasi:
       "Data yang Anda kirim hanya dipakai untuk membalas pertanyaan ini. Kami tidak menyimpannya di database situs dan tidak membagikannya ke pihak lain untuk keperluan pemasaran, sejalan dengan UU PDP No. 27/2022.",
+    // G-46: hanya tampil bila Turnstile aktif — Cloudflare ikut memproses data teknis
+    // perangkat pengunjung, jadi kalimat privasi di atas saja tidak lagi lengkap.
+    catatanPemeriksaan:
+      "Form ini dilindungi Cloudflare Turnstile untuk menangkal spam. Untuk pemeriksaan itu, Cloudflare memproses data teknis perangkat Anda (seperti alamat IP dan jenis peramban) sesuai kebijakan privasinya; isi pesan Anda tidak dikirim ke Cloudflare.",
   },
 
   penutup: {

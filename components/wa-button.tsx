@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { waLink } from "@/content/site";
 import { kelas, panahTombol, tombolPrimer, tombolSekunder } from "./styles";
+import { Icon } from "./icon";
 
 /**
  * Tombol yang membuka WhatsApp. Nomor WA TIDAK pernah ditulis di komponen —
@@ -40,9 +41,7 @@ export function WaButton({
     >
       {children}
       {panah ? (
-        <span aria-hidden="true" className={panahTombol}>
-          &rarr;
-        </span>
+        <Icon name="arrow-right-01" size={16} className={panahTombol} />
       ) : null}
     </a>
   );

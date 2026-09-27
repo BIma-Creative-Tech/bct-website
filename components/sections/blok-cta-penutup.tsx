@@ -6,6 +6,7 @@ import { WaButton } from "@/components/wa-button";
 import type { BlokCta } from "@/content/copy";
 import { tautanHidup } from "@/content/rute";
 import { kelasBarisTombol, kelasJudulSection, kelasParagrafSection } from "./kelas-section";
+import { propsReveal } from "@/components/reveal";
 
 /**
  * Blok CTA penutup halaman — tujuan tunggal situs ini: memulai chat WhatsApp
@@ -23,7 +24,7 @@ export function BlokCtaPenutup({ cta, idJudul }: { cta: BlokCta; idJudul: string
 
   return (
     <section aria-labelledby={idJudul} className={kelas(wadah, "py-16 sm:py-24")}>
-      <div className="muncul-saat-gulir relative isolate overflow-hidden rounded-3xl border border-line bg-surface">
+      <div {...propsReveal()} className="relative isolate overflow-hidden rounded-3xl border border-line bg-surface">
         {/* Blob aksen berdenyut di latar kartu (pola referensi v0, G-29). */}
         <BlobLatar posisi="kanan-atas" />
         {/* Pita gradien di tepi atas kartu — dekoratif, teks tetap di latar surface. */}

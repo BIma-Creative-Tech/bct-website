@@ -10,10 +10,8 @@ export const site = {
   tagline: "Sistem bisnis modern untuk UKM Indonesia — ERP, dashboard AI, dan aplikasi yang dibangun cepat dan presisi.",
   whatsappNumber: "6285640718785",
   email: "am.ademaryadi@gmail.com",
-  // SEMENTARA: domain lokal untuk development.
-  // metadataBase dan URL OG image di app/layout.tsx mengikuti nilai ini.
-  // WAJIB diganti ke domain produksi sebelum deploy production (checklist W3-04).
-  domain: "http://localhost:3000",
+  // Domain TIDAK lagi di sini (ADR 2026-09-26): URL publik kanonik = env `SITE_URL`
+  // runtime (lib/env.ts, lib/site.ts) — metadataBase, canonical, og:url, sitemap, robots.
   location: "",
 } as const;
 

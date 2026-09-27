@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Bricolage_Grotesque, Figtree, IBM_Plex_Mono } from "next/font/google";
+import { IconsaxLoader } from "@/components/iconsax-loader";
+import { ScrollEnhancer } from "@/components/scroll-enhancer";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
 import { SkipLink } from "@/components/skip-link";
 import { WaFloatingButton } from "@/components/wa-floating-button";
 import { site } from "@/content/site";
+import { getEnv } from "@/lib/env";
+import { isIndexable } from "@/lib/site";
 import "./globals.css";
 
 const bricolage = Bricolage_Grotesque({
@@ -23,18 +28,30 @@ const plexMono = IBM_Plex_Mono({
   weight: ["400", "500", "600"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: `Sistem bisnis modern untuk UKM Indonesia — ${site.name}`,
-    template: `%s — ${site.name}`,
-  },
-  description: site.tagline,
-  metadataBase: new URL(site.domain),
-};
+/**
+ * `metadataBase` (dasar canonical, og:url, dan URL kartu OG) dibaca dari env `SITE_URL` SAAT
+ * REQUEST, bukan dari konstanta build — satu image untuk staging dan production (ADR
+ * 2026-09-26, pola web-starter). Host staging/localhost → `noindex, nofollow`.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const { SITE_URL } = getEnv();
+  return {
+    title: {
+      default: `Sistem bisnis modern untuk UKM Indonesia — ${site.name}`,
+      template: `%s — ${site.name}`,
+    },
+    description: site.tagline,
+    metadataBase: new URL(SITE_URL),
+    robots: isIndexable(SITE_URL) ? { index: true, follow: true } : { index: false, follow: false },
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Render dinamis per request agar nonce CSP (proxy.ts) bisa diterapkan Next ke skripnya
+  // (docs guides/content-security-policy.md §Forcing dynamic rendering).
+  await connection();
   return (
     <html lang="id" className={`${bricolage.variable} ${figtree.variable} ${plexMono.variable}`}>
       <body className="flex min-h-dvh flex-col">
@@ -47,6 +64,10 @@ export default function RootLayout({
         </main>
         <SiteFooter />
         <WaFloatingButton />
+        {/* Pulau client kecil: mendaftarkan <iconsax-icon> + subset ikon saat idle (G-37). */}
+        <IconsaxLoader />
+        {/* Pulau client kecil: reveal saat digulir + Number Ticker, mulai saat idle (G-38). */}
+        <ScrollEnhancer />
       </body>
     </html>
   );

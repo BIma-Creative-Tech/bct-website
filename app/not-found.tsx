@@ -1,12 +1,17 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { LinkButton } from "@/components/link-button";
-import { SectionHalaman, kelasBarisTombol, kelasJudulSection } from "@/components/sections";
+// Impor langsung (bukan barrel @/components/sections): barrel mengekspor <HeroHalaman> yang
+// memuat pulau client <HeroAnimator>/<AnimatedGridSquares> — 404 tidak merendernya (G-38).
+import { kelasBarisTombol, kelasJudulSection } from "@/components/sections/kelas-section";
+import { SectionHalaman } from "@/components/sections/section-halaman";
+import { propsReveal } from "@/components/reveal";
 import { fokusRing, kelas } from "@/components/styles";
 import { WaButton } from "@/components/wa-button";
 import { tidakDitemukan } from "@/content/copy";
 import { saringTautan, tautanHidup } from "@/content/rute";
 import { produk, site } from "@/content/site";
+import { Icon } from "@/components/icon";
 
 /**
  * Halaman 404 seluruh situs (rute /_not-found).
@@ -119,8 +124,8 @@ export default function TidakDitemukan() {
           {tidakDitemukan.judulTautanBantu}
         </h2>
         <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {tautanProduk.map((item) => (
-            <li key={item.slug} className="flex">
+          {tautanProduk.map((item, i) => (
+            <li key={item.slug} {...propsReveal(i)} className="flex">
               <Link
                 href={item.href}
                 className={kelas(
@@ -131,12 +136,11 @@ export default function TidakDitemukan() {
               >
                 <h3 className="flex items-start justify-between gap-3 font-display text-lg font-bold text-ink">
                   {item.nama}
-                  <span
-                    aria-hidden="true"
-                    className="text-muted group-hover:text-accent motion-safe:transition-colors"
-                  >
-                    &rarr;
-                  </span>
+                  <Icon
+                    name="arrow-right-01"
+                    size={20}
+                    className="mt-1 text-muted group-hover:text-accent motion-safe:transition-colors"
+                  />
                 </h3>
                 <p className="mt-3 text-sm text-ink-2">{item.subLabel}</p>
               </Link>

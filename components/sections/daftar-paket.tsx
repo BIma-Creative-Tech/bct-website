@@ -2,6 +2,7 @@ import { kartuInteraktif, kelas } from "@/components/styles";
 import { WaButton } from "@/components/wa-button";
 import type { Paket } from "@/content/site";
 import { DaftarTanda } from "./daftar-tanda";
+import { propsReveal } from "@/components/reveal";
 
 /**
  * Kartu paket/harga. SELURUH isinya (nama, harga, satuan, deskripsi, fitur, pesan
@@ -40,11 +41,12 @@ export function DaftarPaket({
 
   return (
     <ul className={kelas("grid gap-4 sm:grid-cols-2", className)}>
-      {paket.map((item) => (
+      {paket.map((item, i) => (
         <li
           key={item.nama}
+          {...propsReveal(i)}
           className={kelas(
-            "muncul-saat-gulir flex flex-col rounded-2xl border border-line bg-surface p-6 sm:p-8",
+            "flex flex-col rounded-2xl border border-line bg-surface p-6 sm:p-8",
             kartuInteraktif,
           )}
         >
