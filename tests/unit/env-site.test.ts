@@ -22,7 +22,7 @@ describe("parseEnv (kontrak env container)", () => {
       /NEXT_PUBLIC_LEAD_WEBHOOK_URL/,
     );
     expect(() => parseEnv({ SITE_URL: "http://localhost", NEXT_PUBLIC_API_TOKEN: "x" })).toThrow(/NEXT_PUBLIC_API_TOKEN/);
-    expect(parseEnv({ SITE_URL: "http://localhost", NEXT_PUBLIC_UMAMI_ID: "x" }).SITE_URL).toBe("http://localhost");
+    expect(parseEnv({ SITE_URL: "http://localhost", NEXT_PUBLIC_CONTOH_ID: "x" }).SITE_URL).toBe("http://localhost");
   });
 });
 

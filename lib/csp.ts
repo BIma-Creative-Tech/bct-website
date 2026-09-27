@@ -5,10 +5,12 @@
  * - script-src: nonce per request + 'strict-dynamic', TANPA 'unsafe-inline' (G-32).
  *   'unsafe-eval' hanya di `next dev` (React dev overlay menyusun callstack lewat eval —
  *   pengecualian G-14, fail-closed: hanya bila `isDev` true).
- * - Umami (NEXT_PUBLIC_UMAMI_SRC, opsional): origin-nya diizinkan di script-src (fallback
- *   peramban CSP2; di CSP3 'strict-dynamic' mengabaikan host, jadi skrip Umami WAJIB
- *   dirender lewat `next/script` yang otomatis menerima nonce) dan di connect-src (beacon).
- *   Hanya origin https yang diterima; nilai tak sah diabaikan (fail-closed).
+ * - Umami (G-47) — HANYA bila aktif (UMAMI_SCRIPT_URL + UMAMI_WEBSITE_ID, lib/umami.ts): origin
+ *   yang DITURUNKAN dari URL skrip (bukan wildcard, bukan path) masuk script-src (fallback peramban
+ *   tanpa CSP3; di CSP3 'strict-dynamic' mengabaikan host dan yang berlaku adalah nonce pada tag
+ *   <script> di root layout) dan connect-src (tracker mengirim ke `<origin>/api/send`). Hanya
+ *   https tanpa kredensial/query/fragment; nilai tak sah → tanpa tambahan (fail-closed). Mati →
+ *   CSP identik dengan sebelum G-47.
  * - style-src 'unsafe-inline' dipertahankan dari baseline lama (G-04): Tailwind/next/font dan
  *   atribut `style` inline. Sengaja TANPA nonce — menurut CSP3 kehadiran nonce membuat
  *   'unsafe-inline' diabaikan.
@@ -25,23 +27,16 @@
  *   connect-src TIDAK ditambah: docs hanya memintanya untuk pre-clearance (tidak dipakai),
  *   dan itu pun cukup 'self'. Nihil tambahan saat Turnstile mati — CSP identik dengan sebelum G-43.
  */
+import { umamiOrigin } from "@/lib/umami";
+
 export const ASAL_TURNSTILE = "https://challenges.cloudflare.com";
 
-export function umamiOrigin(src: string | undefined): string | null {
-  if (!src) return null;
-  try {
-    const url = new URL(src);
-    return url.protocol === "https:" ? url.origin : null;
-  } catch {
-    return null;
-  }
-}
-
-export function buildCsp(nonce: string, isDev = false, umamiSrc?: string, turnstile = false): string {
+/** `umamiScriptUrl` = URL skrip Umami bila analytics aktif (lihat `konfigUmami`), selain itu kosong. */
+export function buildCsp(nonce: string, isDev = false, umamiScriptUrl?: string, turnstile = false): string {
   if (!/^[A-Za-z0-9+/=_-]{16,}$/.test(nonce)) {
     throw new Error("nonce tidak valid");
   }
-  const umami = umamiOrigin(umamiSrc);
+  const umami = umamiOrigin(umamiScriptUrl);
   const extra = umami ? ` ${umami}` : "";
   const ts = turnstile ? ` ${ASAL_TURNSTILE}` : "";
   const directives = [

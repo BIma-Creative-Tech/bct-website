@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ENV_UMAMI, masalahUrlSkrip, websiteIdSah } from "@/lib/umami";
 
 /**
  * Env runtime — KONTRAK container. Pola dan nama SAMA dengan web-starter (`src/lib/env.ts`) dan
@@ -15,6 +16,9 @@ import { z } from "zod";
  *     NEXT_PUBLIC_* (nilai itu dibakar saat build, sedangkan satu image melayani staging &
  *     production dengan widget berbeda; dan `assertNoPublicSecrets` menolak NEXT_PUBLIC_*_KEY):
  *     dibaca server saat request dan dioper ke form sebagai prop. Secret = PATH file.
+ *   UMAMI_SCRIPT_URL + UMAMI_WEBSITE_ID (G-47, opsional BERPASANGAN; nama & aturan nilai di
+ *     lib/umami.ts — kontrak provisional infra plan 11) — keduanya kosong → analytics mati;
+ *     hanya salah satu atau nilai tidak sah → boot gagal (exit 1).
  *
  * Divalidasi saat boot (instrumentation.ts) → container exit 1 bila salah. Dibaca lazy
  * (getEnv) sehingga `next build` TIDAK membutuhkan env runtime: semua halaman dirender
@@ -53,6 +57,8 @@ export const envSchema = z
       z.string().regex(/^[A-Za-z0-9_-]{10,100}$/, { message: "format site key tidak sah" }).optional(),
     ),
     TURNSTILE_SECRET_FILE: optionalString,
+    [ENV_UMAMI.scriptUrl]: optionalString,
+    [ENV_UMAMI.websiteId]: optionalString,
   })
   .superRefine((env, ctx) => {
     if (Boolean(env.TURNSTILE_SITE_KEY) !== Boolean(env.TURNSTILE_SECRET_FILE)) {
@@ -61,6 +67,17 @@ export const envSchema = z
     }
     if (env.TURNSTILE_SECRET_FILE && !env.TURNSTILE_SECRET_FILE.startsWith("/")) {
       ctx.addIssue({ code: "custom", path: ["TURNSTILE_SECRET_FILE"], message: "harus path absolut" });
+    }
+    const skripUmami = env[ENV_UMAMI.scriptUrl];
+    const idUmami = env[ENV_UMAMI.websiteId];
+    if (Boolean(skripUmami) !== Boolean(idUmami)) {
+      const hilang = skripUmami ? ENV_UMAMI.websiteId : ENV_UMAMI.scriptUrl;
+      ctx.addIssue({ code: "custom", path: [hilang], message: "wajib berpasangan (isi keduanya atau kosongkan keduanya)" });
+    }
+    const masalahSkrip = skripUmami ? masalahUrlSkrip(skripUmami) : null;
+    if (masalahSkrip) ctx.addIssue({ code: "custom", path: [ENV_UMAMI.scriptUrl], message: masalahSkrip });
+    if (idUmami && !websiteIdSah(idUmami)) {
+      ctx.addIssue({ code: "custom", path: [ENV_UMAMI.websiteId], message: "harus UUID" });
     }
     if (!env.CONTACT_ENABLED) return;
     for (const key of ["SMTP_HOST", "SMTP_USER", "SMTP_FROM_ADDRESS", "SMTP_PASSWORD_FILE"] as const) {

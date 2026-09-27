@@ -5,6 +5,14 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ## [Unreleased]
 
+### Changed
+
+- G-47 (2026-09-27, W3-02 sisi aplikasi): **Umami dibaca saat RUNTIME**, menggantikan `NEXT_PUBLIC_UMAMI_SRC`/`NEXT_PUBLIC_UMAMI_ID` (dibakar saat build — salah untuk satu image staging + production; skripnya pun tidak pernah dirender). Kontrak provisional infra plan 11 (nama terpusat di `lib/umami.ts`, `ENV_UMAMI`): `UMAMI_SCRIPT_URL` (https, URL sah, tanpa kredensial/query/fragment, host ASCII tanpa `*`, path bukan `/`) + `UMAMI_WEBSITE_ID` (UUID), **berpasangan** — keduanya kosong → nol skrip & CSP identik; salah satu saja / nilai tak sah → boot exit 1 menyebut NAMA variabel saja. Aktif → root layout merender `<script defer src nonce data-website-id data-domains=<host SITE_URL> data-do-not-track="true">` (server component, nonce `x-nonce` dari `proxy.ts`), dan CSP menambah origin turunan URL skrip ke `script-src` (fallback non-CSP3) dan `connect-src` (`/api/send`). Uji: `env-umami` (20), `umami-layout` (4), `csp` (+11).
+
+### Removed
+
+- G-47: seluruh jejak `NEXT_PUBLIC_UMAMI_*` (proxy.ts, lib/csp.ts, `.env.example`, README, CLAUDE.md, uji).
+
 ## [0.1.0] - 2026-09-27
 
 Rilis pertama: live di https://bimacreative.tech (VPS di belakang Traefik, ADR 2026-09-26). Isi rilis = semua entri di bawah ini.

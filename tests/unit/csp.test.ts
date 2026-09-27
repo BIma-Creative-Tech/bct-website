@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildCsp, generateNonce, umamiOrigin } from "@/lib/csp";
+import { buildCsp, generateNonce } from "@/lib/csp";
+import { umamiOrigin } from "@/lib/umami";
 
 const directive = (csp: string, name: string) => csp.split("; ").find((d) => d.startsWith(`${name} `))!;
 
@@ -77,5 +78,57 @@ describe("CSP — Turnstile (G-43)", () => {
     const tanpa = buildCsp(n, false).split("; ");
     const dengan = csp.split("; ");
     expect(dengan.filter((d) => !tanpa.includes(d))).toHaveLength(2);
+  });
+});
+
+describe("CSP — Umami runtime (G-47)", () => {
+  const URL_SKRIP = "https://analytics.example.test/stats.js";
+
+  it("mati: identik dengan tanpa argumen — tidak ada host tambahan di mana pun", () => {
+    const n = generateNonce();
+    expect(buildCsp(n, false, undefined)).toBe(buildCsp(n, false));
+    expect(buildCsp(n, false, "")).toBe(buildCsp(n, false));
+  });
+
+  it("aktif: HANYA origin turunan masuk script-src & connect-src; direktif lain tetap", () => {
+    const n = generateNonce();
+    const csp = buildCsp(n, false, URL_SKRIP);
+    expect(directive(csp, "script-src")).toBe(`script-src 'self' 'nonce-${n}' 'strict-dynamic' https://analytics.example.test`);
+    expect(directive(csp, "connect-src")).toBe("connect-src 'self' https://analytics.example.test");
+    expect(csp).not.toContain("stats.js");
+    expect(csp).not.toMatch(/\*/);
+    const tanpa = buildCsp(n, false).split("; ");
+    expect(csp.split("; ").filter((d) => !tanpa.includes(d))).toHaveLength(2);
+  });
+
+  it("port non-bawaan ikut origin; port bawaan dinormalisasi", () => {
+    expect(directive(buildCsp(generateNonce(), false, "https://a.example.test:8443/s.js"), "connect-src")).toBe(
+      "connect-src 'self' https://a.example.test:8443",
+    );
+    expect(directive(buildCsp(generateNonce(), false, "https://a.example.test:443/s.js"), "connect-src")).toBe(
+      "connect-src 'self' https://a.example.test",
+    );
+  });
+
+  it.each([
+    "http://analytics.example.test/stats.js",
+    "https://user:pw@analytics.example.test/stats.js",
+    "https://analytics.example.test/stats.js?v=1",
+    "https://analytics.example.test/stats.js#x",
+    "https://analytics.example.test/",
+    "https://*.example.test/stats.js",
+    "javascript:alert(1)",
+  ])("URL tak sah %j → tanpa tambahan (fail-closed)", (u) => {
+    const n = generateNonce();
+    expect(buildCsp(n, false, u)).toBe(buildCsp(n, false));
+  });
+
+  it("bersama Turnstile: keduanya ditambahkan, Umami tidak menyentuh frame-src", () => {
+    const n = generateNonce();
+    const csp = buildCsp(n, false, URL_SKRIP, true);
+    expect(directive(csp, "script-src")).toBe(
+      `script-src 'self' 'nonce-${n}' 'strict-dynamic' https://analytics.example.test https://challenges.cloudflare.com`,
+    );
+    expect(directive(csp, "frame-src")).toBe("frame-src 'self' https://challenges.cloudflare.com");
   });
 });
