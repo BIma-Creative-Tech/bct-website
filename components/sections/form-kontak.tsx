@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { AKSI_PEMERIKSAAN, BATAS_ISIAN } from "@/app/api/lead/batas";
-import { fokusRing, kelas, tombolPrimer } from "@/components/styles";
+import { fokusRing, kelas, tautanTeks, tombolPrimer } from "@/components/styles";
 import type { FormKontakCopy } from "@/content/copy";
+import { tautanHidup } from "@/content/rute";
 
 /**
  * Form lead — SATU-SATUNYA client component di halaman /kontak.
@@ -316,6 +318,8 @@ export function FormKontak({
   kunciPemeriksaan?: string;
 }) {
   const id = useId();
+  // G-48: tautan /privasi di bawah catatan privasi — disaring rute hidup (W2-12).
+  const tautanPrivasi = tautanHidup(copy.tautanPrivasi);
   const idNama = `${id}-nama`;
   const idKontak = `${id}-kontak`;
   const idProduk = `${id}-produk`;
@@ -730,7 +734,17 @@ export function FormKontak({
         />
       </div>
 
-      <p className="mt-8 max-w-[65ch] text-sm text-ink-2">{copy.catatanPrivasi}</p>
+      <p className="mt-8 max-w-[65ch] text-sm text-ink-2">
+        {copy.catatanPrivasi}
+        {tautanPrivasi ? (
+          <>
+            {" "}
+            <Link href={tautanPrivasi.href} className={tautanTeks}>
+              {tautanPrivasi.label}
+            </Link>
+          </>
+        ) : null}
+      </p>
       {kunciPemeriksaan ? (
         <p className="mt-2 max-w-[65ch] text-sm text-ink-2">{copy.catatanPemeriksaan}</p>
       ) : null}

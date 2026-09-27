@@ -1,4 +1,4 @@
-import type { BlokCta, HeroCopy, KepalaSection, MetaCopy } from "./types";
+import type { BlokCta, CtaTautan, HeroCopy, KepalaSection, MetaCopy } from "./types";
 
 /**
  * KERANGKA halaman /kontak. Copy sudah final dan siap tayang.
@@ -196,6 +196,11 @@ export type FormKontakCopy = {
    */
   pemeriksaan: { menunggu: string };
   catatanPrivasi: string;
+  /**
+   * Tautan ke /privasi (G-48), dirender tepat setelah `catatanPrivasi` dan disaring
+   * `tautanHidup()` (content/rute.ts) — tidak tayang bila rutenya belum terdaftar.
+   */
+  tautanPrivasi: CtaTautan;
   /** Tampil hanya bila Turnstile aktif (G-46). */
   catatanPemeriksaan: string;
 };
@@ -385,6 +390,10 @@ export const kontak: KontakCopy = {
     // ketiga — kalau ternyata iya, kalimat privasi ini WAJIB diubah agar tetap jujur.
     catatanPrivasi:
       "Data yang Anda kirim hanya dipakai untuk membalas pertanyaan ini. Kami tidak menyimpannya di database situs dan tidak membagikannya ke pihak lain untuk keperluan pemasaran, sejalan dengan UU PDP No. 27/2022.",
+    tautanPrivasi: {
+      label: "Baca kebijakan privasi",
+      href: "/privasi",
+    },
     // G-46: hanya tampil bila Turnstile aktif — Cloudflare ikut memproses data teknis
     // perangkat pengunjung, jadi kalimat privasi di atas saja tidak lagi lengkap.
     catatanPemeriksaan:

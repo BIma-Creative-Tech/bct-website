@@ -21,7 +21,7 @@
  *
  * PENGECUALIAN SADAR (G-38/G-39, 2026-09-26): <HeroHalaman> kini merender pulau client kecil
  * <HeroAnimator> (anime.js di-import dinamis saat idle) dan <AnimatedGridSquares>. Itu boleh
- * karena SETIAP pengimpor barrel (/pricing, /tentang, /kontak, /produk/* ×3) memang merender
+ * karena SETIAP pengimpor barrel (/pricing, /tentang, /kontak, /privasi, /produk/* ×3) memang merender
  * <HeroHalaman>; beranda memakai keduanya sendiri, dan app/not-found.tsx sengaja mengimpor
  * langsung dari berkasnya. Pengimpor baru yang tidak merender <HeroHalaman> wajib impor langsung.
  *
@@ -43,6 +43,7 @@ export { DaftarPaket } from "./daftar-paket";
 export { DaftarPoin } from "./daftar-poin";
 export { DaftarTanda } from "./daftar-tanda";
 export { HalamanPricing } from "./halaman-pricing";
+export { HalamanPrivasi } from "./halaman-privasi";
 export { HalamanProduk } from "./halaman-produk";
 export { HalamanTentang } from "./halaman-tentang";
 export { HeroHalaman } from "./hero-halaman";

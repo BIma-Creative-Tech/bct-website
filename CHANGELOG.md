@@ -5,6 +5,28 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-27
+
+Umami runtime (G-47, kontrak infra plan 11 disetujui owner di GATE 1 2026-09-27) + halaman `/privasi` (G-48). Tag `v0.2.0` hanya setelah owner konfirmasi.
+
+- Atribusi GeoLite (MaxMind) ditampilkan di /privasi — wajib menurut GeoLite EULA §3 (dicek infra 2026-09-27; G-48).
+
+### Added
+
+- G-48 (2026-09-27, permintaan owner Q11): halaman **`/privasi`** — copy bertipe `content/copy/privasi.ts` (barrel), `<HalamanPrivasi>` (`components/sections/halaman-privasi.tsx`), `metadataHalaman` + `app/privasi/opengraph-image.tsx`, terdaftar di `RUTE_HIDUP` (sitemap 8 `<loc>`, footer "Kebijakan privasi", 404 ikut penyaring). Isi: form kontak (nama, kontak, topik, pesan → email ke kotak surat BCT + webhook opsional, tanpa database; IP hanya untuk anggaran kirim di memori), Cloudflare Turnstile "bila aktif", analitik Umami (draf infra plan 11 yang disetujui owner, substansi verbatim: tanpa cookie, IP tidak disimpan, query tidak dikirim, DNT dihormati, tidak dibagikan/dijual, retensi 25 bulan, dasar kepentingan sah UU PDP), tanggal "Terakhir diperbarui 27 September 2026". Kalimat draf "…dikirim ke info@…" diganti rujukan ke form /kontak + WhatsApp (ADR 2026-08-24 + `check-pii` — alamat email tidak pernah terbit). Atribusi GeoLite2 disiapkan sebagai `atribusiGeoLite2.tampil: false` (menunggu infra). Catatan privasi form /kontak kini menautkan "Baca kebijakan privasi" (disaring `tautanHidup()`).
+
+### Changed
+
+- G-47 (2026-09-27, W3-02 sisi aplikasi): **Umami dibaca saat RUNTIME**, menggantikan `NEXT_PUBLIC_UMAMI_SRC`/`NEXT_PUBLIC_UMAMI_ID` (dibakar saat build — salah untuk satu image staging + production; skripnya pun tidak pernah dirender). Kontrak infra plan 11, **disetujui owner di GATE 1 2026-09-27** (nama terpusat di `lib/umami.ts`, `ENV_UMAMI`): `UMAMI_SCRIPT_URL` (https, URL sah, tanpa kredensial/query/fragment, host ASCII tanpa `*`, path bukan `/`) + `UMAMI_WEBSITE_ID` (UUID), **berpasangan** — keduanya kosong → nol skrip & CSP identik; salah satu saja / nilai tak sah → boot exit 1 menyebut NAMA variabel saja. Aktif → root layout merender `<script defer src nonce data-website-id data-domains=<host SITE_URL> data-exclude-search="true" data-do-not-track="true">` (dua opsi terakhir disetujui GATE 1 Q4 → konstanta `OPSI_PRIVASI_UMAMI`; server component, nonce `x-nonce` dari `proxy.ts`), dan CSP menambah origin turunan URL skrip ke `script-src` (fallback non-CSP3) dan `connect-src` (`/api/send`). Uji: `env-umami` (20), `umami-layout` (5), `csp` (+12, termasuk URL production `https://analytics.bimacreative.tech/insight.js` → hanya origin). Rilis: v0.2.0 (GATE 1 Q9).
+
+- G-47 docs: ADR 2026-09-27 "Umami runtime" (menggantikan `NEXT_PUBLIC_UMAMI_*`; alasan `data-domains`, `data-do-not-track`, aturan URL), tabel env README, `.env.example`, SECURITY.md (CSP bersyarat + butir analytics), CLAUDE.md, komentar kontrak env Dockerfile (hanya komentar).
+
+- G-47 GATE 1 (2026-09-27): owner menyetujui infra plan 11 dengan semua rekomendasi — kontrak `UMAMI_SCRIPT_URL` (`https://analytics.bimacreative.tech/insight.js`) + `UMAMI_WEBSITE_ID` (UUID, berpasangan, zod), skrip ber-nonce + `data-website-id` + `data-do-not-track="true"` + `data-exclude-search="true"`, origin CSP diturunkan saat runtime, `NEXT_PUBLIC_UMAMI_*` dibuang. Penanda "provisional / menunggu GATE 1" dicabut dari `lib/umami.ts`, `lib/env.ts`, uji, `.env.example`, README, SECURITY.md, CLAUDE.md, ADR, dan checklist; uji CSP baru mengunci URL production.
+
+### Removed
+
+- G-47: seluruh jejak `NEXT_PUBLIC_UMAMI_*` (proxy.ts, lib/csp.ts, `.env.example`, README, CLAUDE.md, uji).
+
 ## [0.1.0] - 2026-09-27
 
 Rilis pertama: live di https://bimacreative.tech (VPS di belakang Traefik, ADR 2026-09-26). Isi rilis = semua entri di bawah ini.

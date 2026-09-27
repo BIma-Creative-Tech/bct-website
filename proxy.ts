@@ -11,18 +11,17 @@
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { buildCsp, generateNonce } from "@/lib/csp";
+import { konfigUmami } from "@/lib/umami";
 
 export function proxy(request: NextRequest) {
   const nonce = generateNonce();
   // Turnstile (G-43): tambahan CSP hanya bila widget aktif. Cukup memeriksa site key — pasangan
   // yang tidak lengkap sudah membuat boot gagal (instrumentation.ts), jadi tidak mungkin ada di sini.
   const turnstile = Boolean(process.env.TURNSTILE_SITE_KEY?.trim());
-  const csp = buildCsp(
-    nonce,
-    process.env.NODE_ENV === "development",
-    process.env.NEXT_PUBLIC_UMAMI_SRC,
-    turnstile,
-  );
+  // Umami (G-47): origin skrip hanya bila pasangan env lengkap & sah (dibaca saat request — satu
+  // image untuk staging & production); selain itu CSP tanpa tambahan.
+  const umami = konfigUmami(process.env);
+  const csp = buildCsp(nonce, process.env.NODE_ENV === "development", umami?.scriptUrl, turnstile);
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);

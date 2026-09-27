@@ -29,6 +29,7 @@ export const RUTE_HIDUP = [
   "/pricing",
   "/tentang",
   "/kontak",
+  "/privasi",
 ] as const;
 
 const daftarRute: ReadonlySet<string> = new Set(RUTE_HIDUP);

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { connection } from "next/server";
 import { Bricolage_Grotesque, Figtree, IBM_Plex_Mono } from "next/font/google";
 import { IconsaxLoader } from "@/components/iconsax-loader";
@@ -10,6 +11,7 @@ import { WaFloatingButton } from "@/components/wa-floating-button";
 import { site } from "@/content/site";
 import { getEnv } from "@/lib/env";
 import { isIndexable } from "@/lib/site";
+import { propsSkripUmami } from "@/lib/umami";
 import "./globals.css";
 
 const bricolage = Bricolage_Grotesque({
@@ -46,6 +48,21 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+/**
+ * Tracker Umami self-host (W3-02, G-47) — hanya bila UMAMI_SCRIPT_URL + UMAMI_WEBSITE_ID terisi
+ * (dibaca saat request). Tag <script defer> biasa yang dirender SERVER component ini dengan nonce
+ * request dari proxy.ts (header `x-nonce`), bukan `next/script` (komponen client: nonce harus
+ * dioper sebagai prop client). Catatan jujur: seperti semua elemen server component, atribut tag
+ * ini ikut terserialisasi di payload RSC inline — nonce yang sama SUDAH ada di sana belasan kali
+ * lewat hint preload Next sendiri (diukur di v0.1.0), jadi tidak ada paparan baru.
+ * Atribut & alasannya: lib/umami.ts.
+ */
+async function SkripUmami() {
+  const env = getEnv();
+  const props = propsSkripUmami(env, env.SITE_URL, (await headers()).get("x-nonce"));
+  return props ? <script {...props} /> : null;
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -68,6 +85,7 @@ export default async function RootLayout({
         <IconsaxLoader />
         {/* Pulau client kecil: reveal saat digulir + Number Ticker, mulai saat idle (G-38). */}
         <ScrollEnhancer />
+        <SkripUmami />
       </body>
     </html>
   );
