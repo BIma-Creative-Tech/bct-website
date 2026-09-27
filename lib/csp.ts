@@ -8,7 +8,8 @@
  * - Umami (G-47) — HANYA bila aktif (UMAMI_SCRIPT_URL + UMAMI_WEBSITE_ID, lib/umami.ts): origin
  *   yang DITURUNKAN dari URL skrip (bukan wildcard, bukan path) masuk script-src (fallback peramban
  *   tanpa CSP3; di CSP3 'strict-dynamic' mengabaikan host dan yang berlaku adalah nonce pada tag
- *   <script> di root layout) dan connect-src (tracker mengirim ke `<origin>/api/send`). Hanya
+ *   <script> di root layout) dan connect-src (tracker POST `<origin>/api/send` dengan header
+ *   x-umami-*; CORS diurus server Umami, bukan CSP). Hanya
  *   https tanpa kredensial/query/fragment; nilai tak sah → tanpa tambahan (fail-closed). Mati →
  *   CSP identik dengan sebelum G-47.
  * - style-src 'unsafe-inline' dipertahankan dari baseline lama (G-04): Tailwind/next/font dan

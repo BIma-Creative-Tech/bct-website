@@ -5,7 +5,7 @@
  * berubah, cukup ganti `ENV_UMAMI` di bawah — skema env (lib/env.ts), CSP (proxy.ts) dan
  * layout membacanya dari sini.
  *
- *   UMAMI_SCRIPT_URL — URL lengkap skrip tracker, mis. https://analytics.bimacreative.tech/<nama>.js
+ *   UMAMI_SCRIPT_URL — URL lengkap skrip tracker, mis. https://analytics.bimacreative.tech/insight.js
  *     (nama berkas boleh kustom, TRACKER_SCRIPT_NAME Umami). Aturan: URL sah, WAJIB https, tanpa
  *     kredensial (user:pass@ akan terbit ke HTML setiap pengunjung), tanpa query & fragment (tidak
  *     dibutuhkan Umami; query bisa membawa token/penanda yang ikut terbit, dan melarangnya membuat
@@ -84,18 +84,36 @@ export function umamiOrigin(scriptUrl: string | undefined): string | null {
 }
 
 /**
+ * Opsi privasi tracker — MENUNGGU GATE 1 Q4 infra plan 11. Default mengikuti draf plan 11 (true);
+ * untuk membalik cukup ubah nilai di sini (atribut hilang bila false). Uji: tests/unit/umami-layout.
+ * - EXCLUDE_SEARCH → `data-exclude-search="true"`: query string URL tidak dikirim ke Umami
+ *   (query bisa memuat data pribadi/penanda; situs ini tidak butuh query untuk analitik).
+ * - DO_NOT_TRACK → `data-do-not-track="true"`: pengunjung dengan Do Not Track tidak dicatat
+ *   (privasi-bawaan, selaras UU PDP).
+ */
+export const OPSI_PRIVASI_UMAMI = {
+  EXCLUDE_SEARCH: true,
+  DO_NOT_TRACK: true,
+} as const;
+
+/**
  * Atribut tag skrip (ADR 2026-09-27 "Umami runtime"):
  * - `data-domains` = hostname SITE_URL: tracker hanya mengirim bila halaman dibuka di host
  *   kanonik — salinan HTML di host lain (mirror/scraper, localhost, preview) tidak mencemari
  *   statistik, dan staging hanya mencatat bila ia sengaja diberi website ID sendiri.
- * - `data-do-not-track="true"`: pengunjung dengan Do Not Track tidak dicatat (privasi, UU PDP).
+ * - `data-exclude-search` / `data-do-not-track`: lihat OPSI_PRIVASI_UMAMI.
  */
-export function atributSkripUmami(konfig: KonfigUmami, siteUrl: string): Record<string, string> {
+export function atributSkripUmami(
+  konfig: KonfigUmami,
+  siteUrl: string,
+  opsi: { EXCLUDE_SEARCH: boolean; DO_NOT_TRACK: boolean } = OPSI_PRIVASI_UMAMI,
+): Record<string, string> {
   return {
     src: konfig.scriptUrl,
     "data-website-id": konfig.websiteId,
     "data-domains": new URL(siteUrl).hostname,
-    "data-do-not-track": "true",
+    ...(opsi.EXCLUDE_SEARCH ? { "data-exclude-search": "true" } : {}),
+    ...(opsi.DO_NOT_TRACK ? { "data-do-not-track": "true" } : {}),
   };
 }
 
