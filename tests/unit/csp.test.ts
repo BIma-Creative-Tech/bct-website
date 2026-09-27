@@ -101,6 +101,16 @@ describe("CSP — Umami runtime (G-47)", () => {
     expect(csp.split("; ").filter((d) => !tanpa.includes(d))).toHaveLength(2);
   });
 
+  it("kontrak GATE 1 (2026-09-27): URL production → hanya origin analytics.bimacreative.tech", () => {
+    const n = generateNonce();
+    const csp = buildCsp(n, false, "https://analytics.bimacreative.tech/insight.js");
+    expect(directive(csp, "script-src")).toBe(
+      `script-src 'self' 'nonce-${n}' 'strict-dynamic' https://analytics.bimacreative.tech`,
+    );
+    expect(directive(csp, "connect-src")).toBe("connect-src 'self' https://analytics.bimacreative.tech");
+    expect(csp).not.toContain("insight.js");
+  });
+
   it("port non-bawaan ikut origin; port bawaan dinormalisasi", () => {
     expect(directive(buildCsp(generateNonce(), false, "https://a.example.test:8443/s.js"), "connect-src")).toBe(
       "connect-src 'self' https://a.example.test:8443",

@@ -30,7 +30,7 @@ describe("root layout — skrip Umami (G-47)", () => {
     );
   });
 
-  it("opsi privasi (GATE 1 Q4) = konstanta yang bisa dibalik; false → atributnya hilang", () => {
+  it("opsi privasi (disetujui GATE 1 Q4) = konstanta yang bisa dibalik; false → atributnya hilang", () => {
     expect(OPSI_PRIVASI_UMAMI).toEqual({ EXCLUDE_SEARCH: true, DO_NOT_TRACK: true });
     const atribut = atributSkripUmami(konfigUmami(AKTIF)!, "https://bimacreative.tech", {
       EXCLUDE_SEARCH: false,

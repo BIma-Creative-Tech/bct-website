@@ -1,8 +1,8 @@
 /**
  * Umami self-host (W3-02, G-47) — SATU-SATUNYA tempat nama env dan aturan nilainya.
  *
- * Kontrak PROVISIONAL platform (infra plan 11, belum final sampai GATE 1 owner): kalau namanya
- * berubah, cukup ganti `ENV_UMAMI` di bawah — skema env (lib/env.ts), CSP (proxy.ts) dan
+ * Kontrak platform infra plan 11 — DISETUJUI owner di GATE 1 (2026-09-27, semua rekomendasi).
+ * Nama tetap dipusatkan di `ENV_UMAMI` di bawah: skema env (lib/env.ts), CSP (proxy.ts) dan
  * layout membacanya dari sini.
  *
  *   UMAMI_SCRIPT_URL — URL lengkap skrip tracker, mis. https://analytics.bimacreative.tech/insight.js
@@ -84,8 +84,10 @@ export function umamiOrigin(scriptUrl: string | undefined): string | null {
 }
 
 /**
- * Opsi privasi tracker — MENUNGGU GATE 1 Q4 infra plan 11. Default mengikuti draf plan 11 (true);
- * untuk membalik cukup ubah nilai di sini (atribut hilang bila false). Uji: tests/unit/umami-layout.
+ * Opsi privasi tracker — DISETUJUI owner di GATE 1 infra plan 11 (2026-09-27, Q4: keduanya true).
+ * Tetap satu konstanta supaya perubahan kebijakan kelak cukup di sini (atribut hilang bila false);
+ * salinan /privasi (content/copy/privasi.ts) menjanjikan keduanya — ubah bersamaan. Uji:
+ * tests/unit/umami-layout.
  * - EXCLUDE_SEARCH → `data-exclude-search="true"`: query string URL tidak dikirim ke Umami
  *   (query bisa memuat data pribadi/penanda; situs ini tidak butuh query untuk analitik).
  * - DO_NOT_TRACK → `data-do-not-track="true"`: pengunjung dengan Do Not Track tidak dicatat

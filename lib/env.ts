@@ -17,7 +17,7 @@ import { ENV_UMAMI, masalahUrlSkrip, websiteIdSah } from "@/lib/umami";
  *     production dengan widget berbeda; dan `assertNoPublicSecrets` menolak NEXT_PUBLIC_*_KEY):
  *     dibaca server saat request dan dioper ke form sebagai prop. Secret = PATH file.
  *   UMAMI_SCRIPT_URL + UMAMI_WEBSITE_ID (G-47, opsional BERPASANGAN; nama & aturan nilai di
- *     lib/umami.ts — kontrak provisional infra plan 11) — keduanya kosong → analytics mati;
+ *     lib/umami.ts — kontrak infra plan 11, disetujui GATE 1 2026-09-27) — keduanya kosong → analytics mati;
  *     hanya salah satu atau nilai tidak sah → boot gagal (exit 1).
  *
  * Divalidasi saat boot (instrumentation.ts) → container exit 1 bila salah. Dibaca lazy
