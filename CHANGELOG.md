@@ -5,6 +5,10 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-27
+
+Rilis pertama: live di https://bimacreative.tech (VPS di belakang Traefik, ADR 2026-09-26). Isi rilis = semua entri di bawah ini.
+
 ### Changed
 
 - G-46 (2026-09-27, keputusan owner): Turnstile kini **fail-closed** — siteverify tak terjangkau → `/api/lead` 503 + arahan WhatsApp (sebelumnya diloloskan). Catatan privasi baru di /kontak (hanya bila Turnstile aktif) menyebut Cloudflare memproses data teknis perangkat untuk pemeriksaan spam.
