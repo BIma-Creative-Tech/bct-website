@@ -95,6 +95,8 @@ export const footer: FooterCopy = {
         { label: "Studi kasus", href: "/studi-kasus" },
         { label: "Harga", href: "/pricing" },
         { label: "Kontak", href: "/kontak" },
+        // G-48 (permintaan owner Q11): halaman /privasi.
+        { label: "Kebijakan privasi", href: "/privasi" },
       ],
     },
   ],
@@ -104,6 +106,6 @@ export const footer: FooterCopy = {
   labelHakCipta: "Hak cipta",
   // [TANYA-OWNER] Untuk footer, belum ada di docs:
   // 1. Nomor legalitas PT (NIB/NPWP) — perlu tayang atau tidak?
-  // 2. Apakah perlu tautan Kebijakan Privasi & Syarat Layanan (halaman belum ada di sitemap).
+  // 2. Kebijakan privasi sudah ada (/privasi, G-48). Syarat Layanan — perlu atau tidak?
   // 3. Akun media sosial resmi BCT yang boleh ditautkan.
 };

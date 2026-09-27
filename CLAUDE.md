@@ -64,11 +64,12 @@ Identitas visual sudah ditetapkan (turunan dari dokumen Flight Plan). Token dide
 | `/studi-kasus` | KOMDIGI e-Telekomunikasi + retail | belum (W2-03) — tertahan menunggu fakta proyek dari owner |
 | `/tentang` | Sejarah BCT, cara kerja, tiga mesin | hidup (W2-04) |
 | `/insight` | Blog/artikel pendek (MDX) | belum (W2-06) |
+| `/privasi` | Kebijakan privasi: form kontak, Turnstile (bila aktif), analitik Umami, jalur pertanyaan data (form + WA, **tanpa alamat email**) | hidup (G-48); copy `content/copy/privasi.ts` |
 | `/kontak` | Form lead + WA | hidup (W2-05); `POST /api/lead` → email SMTP ke `info@` (kanal primer, `CONTACT_ENABLED=true` + `SMTP_*`) + webhook opsional `LEAD_WEBHOOK_URL`; tanpa kanal → 503 (G-41, menggantikan G-17); anggaran kirim 20/jam situs + 3/hari per IP (G-42), Cloudflare Turnstile opsional `TURNSTILE_SITE_KEY`+`TURNSTILE_SECRET_FILE` (G-43), jebakan honeypot tidak pernah diteruskan (G-44) |
 
 **Rute hidup dibaca dari `content/rute.ts`** (`RUTE_HIDUP` + `ruteHidup()`/`saringTautan()`/`tautanHidup()`) — satu-satunya sumber; nav, footer, CTA, `app/not-found.tsx`, dan `app/sitemap.ts` semuanya memakainya, jadi menghidupkan `/studi-kasus` atau `/insight` cukup satu baris di berkas itu. Jangan membuat daftar rute kedua. Batas yang perlu diketahui: aturan ini belum dipaksakan mesin (G-23) — tautan literal ke rute mati masih lolos lint/tsc/build.
 
-**Aset SEO sudah ada (W3-01), jangan dibuat ulang:** `app/sitemap.ts` → `/sitemap.xml` (7 `<loc>` dari `RUTE_HIDUP`), `app/robots.ts` → `/robots.txt`, `app/icon.tsx` → favicon, dan tujuh `opengraph-image.tsx` (root + `/pricing` + `/tentang` + `/kontak` + 3 `/produk/*`) → kartu OG 1200×630 lewat `components/og/`. Fontnya di `assets/fonts/`, bukan `public/`. Semua URL absolut (metadataBase, canonical, og:url, kartu OG, sitemap, robots) mengikuti env `SITE_URL` saat request (`lib/site.ts`) — tidak ada domain hard-coded. `/favicon.ico` sendiri tetap 404 (Next melarang favicon dirender kode) — keputusan menunggu owner di W3-01.
+**Aset SEO sudah ada (W3-01), jangan dibuat ulang:** `app/sitemap.ts` → `/sitemap.xml` (8 `<loc>` dari `RUTE_HIDUP`), `app/robots.ts` → `/robots.txt`, `app/icon.tsx` → favicon, dan delapan `opengraph-image.tsx` (root + `/pricing` + `/tentang` + `/kontak` + `/privasi` + 3 `/produk/*`) → kartu OG 1200×630 lewat `components/og/`. Fontnya di `assets/fonts/`, bukan `public/`. Semua URL absolut (metadataBase, canonical, og:url, kartu OG, sitemap, robots) mengikuti env `SITE_URL` saat request (`lib/site.ts`) — tidak ada domain hard-coded. `/favicon.ico` sendiri tetap 404 (Next melarang favicon dirender kode) — keputusan menunggu owner di W3-01.
 
 ## Backlog sprint (kerjakan berurutan)
 

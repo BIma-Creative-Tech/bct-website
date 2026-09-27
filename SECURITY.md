@@ -8,7 +8,7 @@
 4. **Dependency**: `npm audit --omit=dev --audit-level=high` di CI — temuan high/critical memblokir merge. Dependency baru wajib berjustifikasi di PR.
 5. **Docker**: multi-stage, base `node:24.21.0-alpine` di-pin digest, uid 1001 non-root, npm dibuang dari runner, standalone output, HEALTHCHECK `/api/health`; dijalankan read-only + tmpfs, `cap_drop: ALL`, `no-new-privileges`, limit mem/cpu/pids (template infra), di belakang Traefik tanpa port publik.
 6. **CI**: permission `GITHUB_TOKEN` minimal (`contents: read`; `packages: write` hanya job `image`), semua action di-pin SHA, image push ke GHCR hanya setelah semua pemeriksaan + smoke test hijau.
-7. **Analytics**: Umami self-host saja — tidak ada tracker pihak ketiga. Tanpa cookie, `data-exclude-search="true"` (query string tidak dikirim) dan `data-do-not-track="true"` (pengunjung dengan Do Not Track tidak dicatat) — keduanya disetujui owner di GATE 1 infra plan 11 (2026-09-27), konstanta `OPSI_PRIVASI_UMAMI` di `lib/umami.ts`; `data-domains` = host `SITE_URL` (ADR 2026-09-27 "Umami runtime").
+7. **Analytics**: Umami self-host saja — tidak ada tracker pihak ketiga. Tanpa cookie, `data-exclude-search="true"` (query string tidak dikirim) dan `data-do-not-track="true"` (pengunjung dengan Do Not Track tidak dicatat) — keduanya disetujui owner di GATE 1 infra plan 11 (2026-09-27), konstanta `OPSI_PRIVASI_UMAMI` di `lib/umami.ts`; `data-domains` = host `SITE_URL` (ADR 2026-09-27 "Umami runtime"). Penjelasan untuk pengunjung: halaman `/privasi` (G-48) — ubah bersamaan bila opsi ini berubah.
 
 ## Melaporkan kerentanan
 

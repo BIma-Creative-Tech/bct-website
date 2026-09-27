@@ -43,6 +43,9 @@ export type { KutipanKlien, StudiKasus, StudiKasusCopy } from "./studi-kasus";
 export { kontak } from "./kontak";
 export type { FormKontakCopy, JalurKontak, KontakCopy, OpsiProduk } from "./kontak";
 
+export { privasi } from "./privasi";
+export type { BagianPrivasi, PrivasiCopy } from "./privasi";
+
 export { footer, navCta, navProduk, navUtama, waMengambang } from "./umum";
 export type { FooterCopy, GrupFooter, ItemNav, ItemNavProduk } from "./umum";
 
