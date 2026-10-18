@@ -3,7 +3,7 @@
 # Tool dijalankan sebagai container ter-pin tag+digest; action di-pin ke commit SHA tag rilis resmi
 # (SHA & digest = web-starter, diverifikasi di sana 2026-09-25).
 #
-# Image: ghcr.io/bctech-adm/bct-website
+# Image: ghcr.io/bima-creative-tech/bct-website
 #   push ke main           → :sha-<12 char>
 #   push tag vX.Y.Z        → :X.Y.Z + :sha-<12 char>  (tag harus = version di package.json dan
 #                                                     CHANGELOG.md harus memuat ## [X.Y.Z])
@@ -34,7 +34,7 @@ env:
   HADOLINT_IMAGE: hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
   NODE_VERSION: "24.21.0" # sama dengan base image Dockerfile
   NEXT_TELEMETRY_DISABLED: "1"
-  IMAGE_NAME: ghcr.io/bctech-adm/bct-website
+  IMAGE_NAME: ghcr.io/bima-creative-tech/bct-website
 
 jobs:
   actionlint:
