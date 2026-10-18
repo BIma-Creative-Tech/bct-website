@@ -1,6 +1,6 @@
 # UJI LOKAL SAJA (smoke test kontrak image) — BUKAN jalur deploy (ADR 2026-09-26).
 # Deploy staging/production lewat repo infra:
-#   /opt/infra/scripts/provision-web-client.sh bct <staging|prod> --host <fqdn> --image ghcr.io/bctech-adm/bct-website:<ver>
+#   /opt/infra/scripts/provision-web-client.sh bct <staging|prod> --host <fqdn> --image ghcr.io/bima-creative-tech/bct-website:<ver>
 # yang merender templates/web-client/docker-compose.yml (network web-edge, di belakang Traefik).
 #
 # Hardening di bawah MENIRU template infra (read_only + tmpfs, uid 1001, cap_drop ALL,

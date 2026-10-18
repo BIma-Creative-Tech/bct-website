@@ -5,6 +5,14 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ## [Unreleased]
 
+### Security
+
+- G-49 (2026-10-18): patch dependency setelah CI terjadwal merah — `next` 16.3.6 → 16.3.8 (CVE-2026-94483, SSRF Image Optimization), `sharp` 0.35.4 → 0.35.5 (GHSA-wq5f-xc86-pv6w, librsvg), `source-map-js` 1.2.1 → 1.2.2 (CVE-2026-93749, DoS). Lockfile hanya menyentuh paket ini + biner platformnya (PR #4).
+
+### Changed
+
+- G-49 (2026-10-18): image GHCR pindah namespace ke `ghcr.io/bima-creative-tech/bct-website` (repo pindah ke org BIma-Creative-Tech; `GITHUB_TOKEN` org baru tidak boleh push ke `ghcr.io/bctech-adm/*` → job `image` gagal `permission_denied`). Rujukan di workflow, README, CLAUDE.md, docker-compose.yml, agen devops ikut diganti. Image lama `ghcr.io/bctech-adm/bct-website:0.2.0` yang sedang jalan tidak terpengaruh.
+
 ## [0.2.0] - 2026-09-27
 
 Umami runtime (G-47, kontrak infra plan 11 disetujui owner di GATE 1 2026-09-27) + halaman `/privasi` (G-48). Tag `v0.2.0` hanya setelah owner konfirmasi.

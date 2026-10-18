@@ -30,12 +30,12 @@ Aktifkan hook gitleaks sekali per clone: `git config core.hooksPath .githooks` (
 
 Situs self-host di VPS platform, **bukan Vercel**. Alurnya:
 
-1. CI (`.github/workflows/ci.yml`) membangun image, memindainya (Trivy HIGH/CRITICAL), menjalankan smoke test kontrak, lalu push ke **`ghcr.io/bctech-adm/bct-website`** — `:sha-<12>` untuk `main`, `:X.Y.Z` untuk tag `vX.Y.Z` (harus sama dengan `package.json` dan tercatat di CHANGELOG). Tidak ada tag `latest`.
+1. CI (`.github/workflows/ci.yml`) membangun image, memindainya (Trivy HIGH/CRITICAL), menjalankan smoke test kontrak, lalu push ke **`ghcr.io/bima-creative-tech/bct-website`** — `:sha-<12>` untuk `main`, `:X.Y.Z` untuk tag `vX.Y.Z` (harus sama dengan `package.json` dan tercatat di CHANGELOG). Tidak ada tag `latest`.
 2. Repo infra memprovisikan container + router Traefik:
    ```bash
    /opt/infra/scripts/provision-web-client.sh bct staging --host bct.staging.bimacreative.tech \
-     --image ghcr.io/bctech-adm/bct-website:<X.Y.Z>        # usulan host staging
-   /opt/infra/scripts/provision-web-client.sh bct prod --host <domain final> --image ghcr.io/bctech-adm/bct-website:<X.Y.Z> [--www]
+     --image ghcr.io/bima-creative-tech/bct-website:<X.Y.Z>        # usulan host staging
+   /opt/infra/scripts/provision-web-client.sh bct prod --host <domain final> --image ghcr.io/bima-creative-tech/bct-website:<X.Y.Z> [--www]
    ```
    Skrip merender `templates/web-client/docker-compose.yml` (network `web-edge`, tanpa port publik, read-only + tmpfs, uid 1001, `cap_drop: ALL`, limit 256 MB/0,5 CPU/128 pids) dan router Traefik (`crowdsec` → `security-headers` → rate limit; TLS Let's Encrypt). Runbook: `infra/docs/runbooks/web-client-onboarding.md`. Deploy production = gerbang konfirmasi owner (W3-04).
 3. `docker-compose.yml` di repo ini **hanya untuk uji lokal** (hardening yang sama, port hanya `127.0.0.1:3000`).

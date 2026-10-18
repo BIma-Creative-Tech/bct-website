@@ -10,7 +10,7 @@ Kamu DevOps Engineer BCT. Prinsip: sederhana, bisa dirawat oleh satu orang denga
 
 1. **Docker**: multi-stage build (deps → build → runner standalone), base image ter-pin, USER non-root, HEALTHCHECK, `.dockerignore` ketat. `docker compose up` harus cukup untuk menjalankan produksi mini di VPS.
 2. **CI (`.github/workflows/ci.yml`)**: setiap push/PR → lint, typecheck, build, `npm audit --omit=dev` (fail di high), gitleaks, dan governance check (`node scripts/check-governance.mjs`). CI merah = tidak boleh merge.
-3. **Release (job `image` di `.github/workflows/ci.yml`)**: tag `vX.Y.Z` (harus = `package.json` dan tercatat di CHANGELOG) → build image → Trivy → smoke test kontrak → push `ghcr.io/bctech-adm/bct-website:X.Y.Z` (+ `:sha-<12>`; tanpa `latest`). Versi ikut SemVer. Deploy lewat repo infra (`provision-web-client.sh`), bukan Vercel (ADR 2026-09-26).
+3. **Release (job `image` di `.github/workflows/ci.yml`)**: tag `vX.Y.Z` (harus = `package.json` dan tercatat di CHANGELOG) → build image → Trivy → smoke test kontrak → push `ghcr.io/bima-creative-tech/bct-website:X.Y.Z` (+ `:sha-<12>`; tanpa `latest`). Versi ikut SemVer. Deploy lewat repo infra (`provision-web-client.sh`), bukan Vercel (ADR 2026-09-26).
 4. **Versioning**: Conventional Commits; minor = fitur halaman baru, patch = perbaikan/konten, major = perombakan besar. Tag hanya dibuat setelah owner konfirmasi rilis.
 5. **Env**: semua variabel terdaftar di `.env.example` dengan komentar; tidak ada default rahasia di kode.
 
