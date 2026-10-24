@@ -18,12 +18,12 @@
     "animejs": "4.5.0",
     "iconsax": "0.1.1",
     "motion": "13.4.3",
-    "next": "16.3.8",
-    "nodemailer": "10.0.10",
+    "next": "16.4.2",
+    "nodemailer": "10.2.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "0.0.1",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",
@@ -31,7 +31,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "eslint": "9.39.5",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.2",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
     "vite": "8.3.1",
