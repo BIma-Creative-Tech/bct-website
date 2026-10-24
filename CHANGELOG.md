@@ -7,6 +7,8 @@ Aturan proyek: setiap perubahan kode wajib tercatat di [Unreleased] pada commit 
 
 ### Security
 
+- G-50 (2026-10-24): base image Node.js 24.21.0 → 24.22.1 (rilis keamanan 2026-10-20: 5 High tls ×3/dns/brotli, 2 Medium http/crypto, 1 Low permission), `node:24.22.1-alpine` pin digest `sha256:06d7adf3…`, Trivy 0 HIGH/CRITICAL.
+- G-50 (2026-10-24): `next` + `eslint-config-next` 16.3.8 → 16.4.2 (CRITICAL RCE tanpa login GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr; DoS GHSA-p3m5-59mp-jv5r), `zod` 4.6.5 → 4.6.7 (GHSA-mrhx-c7xc-m3w5, high), `nodemailer` 10.0.10 → 10.2.1 (GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w, GHSA-85x2-q946-cp5h). Lockfile hanya menyentuh paket ini + biner `@next/*`; `npm audit --omit=dev` 0 kerentanan; lint, typecheck, test, build hijau di node 24.22.1.
 - G-49 (2026-10-18): patch dependency setelah CI terjadwal merah — `next` 16.3.6 → 16.3.8 (CVE-2026-94483, SSRF Image Optimization), `sharp` 0.35.4 → 0.35.5 (GHSA-wq5f-xc86-pv6w, librsvg), `source-map-js` 1.2.1 → 1.2.2 (CVE-2026-93749, DoS). Lockfile hanya menyentuh paket ini + biner platformnya (PR #4).
 
 ### Changed
