@@ -17,11 +17,11 @@ Website resmi PT Bima Creative Tech (BCT) — company profile, katalog produk, d
 Node **24** (`engines` `>=24 <25`), semua dependency di-pin versi persis. Host VPS tidak punya Node — pakai container (repo di-mount), seperti referensi platform `/opt/src/web-starter`:
 
 ```bash
-docker run --rm -v "$PWD:/app" -w /app node:24.21.0-bookworm-slim sh -c \
+docker run --rm -v "$PWD:/app" -w /app node:24.22.1-bookworm-slim sh -c \
   'npm ci && npm run icons && npm run lint && npm run typecheck && npm test && npm run build'
 # dev server
 docker run --rm -it -v "$PWD:/app" -w /app -p 127.0.0.1:3000:3000 -e SITE_URL=http://localhost:3000 \
-  node:24.21.0-bookworm-slim npm run dev -- -H 0.0.0.0
+  node:24.22.1-bookworm-slim npm run dev -- -H 0.0.0.0
 ```
 
 Aktifkan hook gitleaks sekali per clone: `git config core.hooksPath .githooks` (butuh Docker).

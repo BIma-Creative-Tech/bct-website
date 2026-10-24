@@ -23,11 +23,11 @@ Website company profile + aset jualan BCT. **Tujuan tunggal halaman apa pun: men
 Host VPS **tidak punya Node** — jalankan lewat container (repo di-mount), seperti web-starter:
 
 ```bash
-docker run --rm -v "$PWD:/app" -w /app node:24.21.0-bookworm-slim sh -c \
+docker run --rm -v "$PWD:/app" -w /app node:24.22.1-bookworm-slim sh -c \
   'npm ci && npm run icons && npm run lint && npm run typecheck && npm test && npm run build'
 # dev server (SITE_URL wajib)
 docker run --rm -it -v "$PWD:/app" -w /app -p 127.0.0.1:3000:3000 -e SITE_URL=http://localhost:3000 \
-  node:24.21.0-bookworm-slim npm run dev -- -H 0.0.0.0
+  node:24.22.1-bookworm-slim npm run dev -- -H 0.0.0.0
 ```
 
 `npm run lint` (eslint, 0 warning) · `npm run typecheck` (next typegen + tsc) · `npm test` (vitest, `tests/unit/`) · `npm run build` — semuanya harus lulus sebelum commit. Guard: `node scripts/check-pii.mjs` (setelah build), `node scripts/check-csp.mjs <url> <path…>` (terhadap server hidup). Hook gitleaks: `git config core.hooksPath .githooks` sekali per clone.

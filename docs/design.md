@@ -82,7 +82,7 @@ bento = satu tautan dengan `fokusRing`; target sentuh ≥ 44 px (tombol jeda `mi
 
 ## 5. Verifikasi (2026-09-26, image `bct-website:stage2`, smoke hardened)
 
-- Container `node:24.21.0-bookworm-slim`: `npm ci && npm run icons && npm run lint && npm run
+- Container `node:24.22.1-bookworm-slim`: `npm ci && npm run icons && npm run lint && npm run
   typecheck && npm test && npm run build` exit 0; 7 berkas uji / 31 uji; `git diff --exit-code
   lib/generated/iconsax-icons.json` bersih; `check-pii.mjs` OK (100 berkas).
 - Image read-only, `-u 1001:1001`, `--cap-drop ALL`, no-new-privileges: 7 rute + `/api/health` +

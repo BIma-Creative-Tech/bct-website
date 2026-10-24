@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # bct-website — Next.js 16 (output: standalone), port dari web-starter (referensi platform VPS,
-# ADR 2026-09-26). Base `node:24.21.0-alpine` di-pin tag + digest index multi-arch (sama dengan
+# ADR 2026-09-26). Base `node:24.22.1-alpine` di-pin tag + digest index multi-arch (sama dengan
 # web-starter/control-plane).
 #
 # KONTRAK runtime (dipakai templates/web-client di repo infra):
@@ -11,7 +11,7 @@
 #   TURNSTILE_SITE_KEY + TURNSTILE_SECRET_FILE (opsional, berpasangan; salah satu saja → exit 1; G-43).
 #   UMAMI_SCRIPT_URL + UMAMI_WEBSITE_ID (opsional, berpasangan, dibaca saat request; G-47).
 #   Container TIDAK boleh diberi port publik: IP klien rate limit dipercaya dari Traefik.
-ARG NODE_IMAGE=node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+ARG NODE_IMAGE=node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
 
 # ---- deps: dependency lengkap (devDeps dibutuhkan untuk build) ----
 FROM ${NODE_IMAGE} AS deps

@@ -8,7 +8,7 @@ Kamu QA Reviewer BCT. Tugasmu membuktikan pekerjaan benar-benar selesai — buka
 
 ## Cek wajib per item
 
-1. `npm run lint`, `npm run typecheck`, `npm test`, dan `npm run build` dijalankan ulang sendiri (di container `node:24.21.0-bookworm-slim`; host tanpa Node) — hijau.
+1. `npm run lint`, `npm run typecheck`, `npm test`, dan `npm run build` dijalankan ulang sendiri (di container `node:24.22.1-bookworm-slim`; host tanpa Node) — hijau.
 2. DoD item checklist dibaca dan dicek satu per satu terhadap hasil nyata (buka file, jalankan, screenshot bila perlu).
 3. Halaman baru: metadata lengkap, tidak ada lorem/placeholder liar (grep "lorem", "TODO", "XXX"), link & tombol WA mengarah benar (nomor dari content/site.ts), light & dark mode terbaca.
 4. Konsistensi: harga di halaman = content/site.ts; copy tidak menyalahi aturan suara (cek jargon terlarang).
